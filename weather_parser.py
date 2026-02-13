@@ -8,7 +8,6 @@ import logging
 from typing import Dict
 import re
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class WeatherParser:
@@ -148,16 +147,27 @@ def parse_weather_files(beijing_url: str, jinan_url: str) -> Dict[str, Dict]:
     """
     解析北京和济南的天气
     """
-    result = {}
+    default_weather = {
+        'city': '未知', 'weather': '未知', 'temperature': '未知',
+        'current_temp': '未知', 'wind': '未知',
+        'sunrise': '未知', 'sunset': '未知', 'alerts': []
+    }
+    result = {
+        'beijing': dict(default_weather),
+        'jinan': dict(default_weather)
+    }
+    
     try:
         beijing = WeatherParser(beijing_url)
         result['beijing'] = beijing.get_weather_forecast()
-        
+    except Exception as e:
+        logger.error(f"解析北京天气出错: {e}")
+    
+    try:
         jinan = WeatherParser(jinan_url)
         result['jinan'] = jinan.get_weather_forecast()
-        
     except Exception as e:
-        logger.error(f"解析过程出错: {e}")
+        logger.error(f"解析济南天气出错: {e}")
         
     return result
 

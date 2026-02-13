@@ -4,6 +4,7 @@
 """
 import argparse
 import logging
+import time
 from datetime import datetime
 from config import config
 from weather_parser import parse_weather_files
@@ -36,9 +37,10 @@ def generate_daily_report():
         logger.info("开始生成每日报告")
         logger.info(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         logger.info("=" * 60)
+        start_time = time.time()
         
         # 1. 解析天气数据
-        logger.info("\n[1/3] 获取并解析天气数据...")
+        logger.info("\n[1/4] 获取并解析天气数据...")
         weather_data = parse_weather_files(
             config.BEIJING_WEATHER_URL,
             config.JINAN_WEATHER_URL
@@ -79,6 +81,9 @@ def generate_daily_report():
         html_content = sender.create_html_email(weather_data, processed_data, processed_news)
         logger.info("  - 邮件HTML已生成")
         
+        elapsed = time.time() - start_time
+        logger.info(f"\n✔ 报告生成完成，耗时 {elapsed:.1f} 秒")
+        
         return html_content, sender
         
     except Exception as e:
@@ -98,35 +103,35 @@ def create_test_email() -> str:
 <head>
     <meta charset="UTF-8">
     <style>
-        body {{{{
+        body {{
             font-family: 'Microsoft YaHei', Arial, sans-serif;
             max-width: 600px;
             margin: 0 auto;
             padding: 40px 20px;
             background-color: #f9f9f9;
-        }}}}
-        .container {{{{
+        }}
+        .container {{
             background-color: #ffffff;
             padding: 30px;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
             text-align: center;
-        }}}}
-        h1 {{{{
+        }}
+        h1 {{
             color: #2c3e50;
             font-size: 24px;
             margin-bottom: 20px;
-        }}}}
-        p {{{{
+        }}
+        p {{
             color: #555;
             line-height: 1.6;
             margin: 10px 0;
-        }}}}
-        .success {{{{
+        }}
+        .success {{
             color: #27ae60;
             font-weight: bold;
             font-size: 18px;
-        }}}}
+        }}
     </style>
 </head>
 <body>

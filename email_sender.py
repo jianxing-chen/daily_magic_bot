@@ -8,7 +8,6 @@ from email.mime.multipart import MIMEMultipart
 from typing import Dict, List
 import logging
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -486,14 +485,33 @@ if __name__ == '__main__':
     # 测试代码
     from config import config
     from weather_parser import parse_weather_files
-    from gemini_processor import process_weather_with_ai
     
-    # 获取数据
+    # 获取天气数据
     weather_data = parse_weather_files(
         config.BEIJING_WEATHER_URL,
         config.JINAN_WEATHER_URL
     )
-    processed_data = process_weather_with_ai(weather_data)
+    
+    # 使用模拟数据测试邮件生成（不消耗 API token）
+    processed_data = {
+        'greeting': '早安！今天天气不错哦～',
+        'character': '邓布利多',
+        'weather_advice': {
+            'beijing': '建议穿保暖外套。',
+            'jinan': '建议携带雨伞。'
+        }
+    }
+    mock_news = [
+        {
+            'title_cn': '测试新闻标题',
+            'title_en': 'Test News Title',
+            'summary': '这是一条测试新闻的摘要。',
+            'url': 'https://example.com',
+            'date': '2026-02-13',
+            'source': 'Nature',
+            'category': 'A'
+        }
+    ]
     
     # 创建邮件
     sender = EmailSender(
@@ -503,7 +521,7 @@ if __name__ == '__main__':
         config.SENDER_PASSWORD
     )
     
-    html = sender.create_html_email(weather_data, processed_data)
+    html = sender.create_html_email(weather_data, processed_data, mock_news)
     
     # 保存HTML用于预览
     with open('/tmp/email_preview.html', 'w', encoding='utf-8') as f:

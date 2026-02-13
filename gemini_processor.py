@@ -6,8 +6,8 @@ from google import genai
 from typing import List, Dict
 import random
 import logging
+import json
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -25,123 +25,6 @@ class GeminiProcessor:
         self.model_name = 'gemini-3-flash-preview'
         logger.info("Gemini处理器初始化成功")
     
-    def generate_weather_content(self, character_name: str, weather_info: Dict) -> Dict[str, str]:
-        """
-        一次性生成哈利波特问候和天气建议
-        
-        Args:
-            character_name: 角色名称
-            weather_info: 天气信息
-            
-        Returns:
-            包含 greeting, advice_beijing, advice_jinan 的字典
-        """
-        try:
-            beijing = weather_info.get('beijing', {})
-            jinan = weather_info.get('jinan', {})
-            
-            prompt = f"""你是哈利波特世界中的{character_name}。请根据以下天气信息，一次性生成问候语和穿衣建议。
-
-天气数据：
-- 北京：{beijing.get('weather', '未知')}，{beijing.get('temperature', '未知')}，{beijing.get('wind', '未知')}
-- 济南：{jinan.get('weather', '未知')}，{jinan.get('temperature', '未知')}，{jinan.get('wind', '未知')}
-
-请严格按照以下 JSON 格式返回（不要包含 Markdown 代码块标记）：
-{{
-    "greeting": "以{character_name}的第一人称口吻写的开场白（50-100字）。总结天气，语气符合角色性格，清新自然。",
-    "advice_beijing": "北京的穿衣建议和注意事项（2-3行）。实用具体，包含穿衣和带伞/保暖提醒。",
-    "advice_jinan": "济南的穿衣建议和注意事项（2-3行）。实用具体，包含穿衣和带伞/保暖提醒。"
-}}
-"""
-            
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config={'response_mime_type': 'application/json'}
-            )
-            
-            import json
-            return json.loads(response.text)
-            
-        except Exception as e:
-            logger.error(f"生成天气内容失败: {e}")
-            return {
-                "greeting": f"{character_name}祝您早安！新的一天开始了！",
-                "advice_beijing": "请根据天气情况适当增减衣物。",
-                "advice_jinan": "请根据天气情况适当增减衣物。"
-            }
-    
-    def summarize_news_article(self, article_content: str, title: str) -> str:
-        """
-        总结新闻文章
-        
-        Args:
-            article_content: 文章全文
-            title: 文章标题
-            
-        Returns:
-            中文总结(3-5行)
-        """
-        try:
-            prompt = f"""请阅读以下科学新闻并用中文总结（3-5行）：
-
-标题：{title}
-
-正文：
-{article_content[:2000]}  # 限制长度避免token超限
-
-要求：
-1. 用中文总结
-2. 3-5行，简洁清晰
-3. 突出研究发现的关键点
-4. 不要添加标题或序号
-5. 直接返回总结内容
-"""
-            
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt
-            )
-            
-            return response.text.strip()
-            
-        except Exception as e:
-            logger.error(f"总结文章失败: {e}")
-            return "暂无总结"
-    
-    def translate_news_title(self, english_title: str) -> str:
-        """
-        将英文新闻标题翻译成中文
-        
-        Args:
-            english_title: 英文标题
-            
-        Returns:
-            中文标题
-        """
-        try:
-            prompt = f"""请将以下英文新闻标题翻译成中文：
-
-"{english_title}"
-
-要求：
-1. 翻译准确、专业
-2. 保持科学术语的准确性
-3. 只返回中文标题，不要其他内容
-"""
-            
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt
-            )
-            
-            return response.text.strip()
-            
-        except Exception as e:
-            logger.error(f"翻译标题失败: {e}")
-            return english_title  # 失败时返回原标题
-
-
     def generate_master_content(self, character_name: str, weather_info: Dict, news_list: List[Dict]) -> Dict:
         """
         一次性生成所有AI内容：问候（含新闻综述）、天气建议、新闻筛选
@@ -218,8 +101,24 @@ class GeminiProcessor:
                 config={'response_mime_type': 'application/json'}
             )
             
-            import json
-            return json.loads(response.text)
+            result = json.loads(response.text)
+            
+            # 校验必要字段
+            required_keys = ['greeting', 'advice_beijing', 'advice_jinan', 'selected_news']
+            for key in required_keys:
+                if key not in result:
+                    logger.warning(f"AI返回缺少字段: {key}，使用默认值")
+                    if key == 'selected_news':
+                        result[key] = [{"index": i, "category": "C"} for i in range(1, min(16, len(news_list) + 1))]
+                    else:
+                        result[key] = ''
+            
+            # 校验 selected_news 格式
+            if not isinstance(result.get('selected_news'), list):
+                logger.warning("selected_news 格式异常，使用默认值")
+                result['selected_news'] = [{"index": i, "category": "C"} for i in range(1, min(16, len(news_list) + 1))]
+            
+            return result
             
         except Exception as e:
             logger.error(f"生成主要内容失败: {e}")
@@ -281,8 +180,12 @@ class GeminiProcessor:
                 config={'response_mime_type': 'application/json'}
             )
             
-            import json
             results = json.loads(response.text)
+            
+            # 校验返回列表格式
+            if not isinstance(results, list):
+                logger.warning(f"AI返回非列表格式: {type(results)}，尝试降级处理")
+                results = []
             
             # 合并结果
             processed_news = []

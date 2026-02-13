@@ -46,6 +46,12 @@ class Config:
         if cls.SENDER_EMAIL == 'your_email@gmail.com':
             errors.append('请配置SENDER_EMAIL')
         
+        if cls.SENDER_PASSWORD == 'your_app_password':
+            errors.append('请配置SENDER_PASSWORD')
+        
+        if not cls.RECEIVER_EMAILS or cls.RECEIVER_EMAILS == ['email1@example.com', 'email2@example.com']:
+            errors.append('请配置RECEIVER_EMAILS')
+        
         return errors
 
 # 导出配置实例

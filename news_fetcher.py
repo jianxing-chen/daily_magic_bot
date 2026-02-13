@@ -8,10 +8,10 @@ import feedparser
 import logging
 from typing import List, Dict
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 import re
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -66,26 +66,40 @@ class MultiSourceNewsFetcher:
         """
         all_news = []
         
-        logger.info("开始从多个新闻源获取标题...")
+        logger.info("开始从多个新闻源并行获取标题...")
         
-        # 1. Nature 最新新闻（网页抓取）
-        all_news.extend(self._fetch_nature_news())
-        
-        # 2-5. Nature 系列 RSS
+        # 构建所有抓取任务
+        tasks = []
+        # Nature 网页抓取
+        tasks.append(('nature_web', None, None, None))
+        # RSS 源
         for key, (url, source_name) in self.nature_rss.items():
-            all_news.extend(self._fetch_rss(url, source_name, max_items=60))
-        
-        # 6. Science 杂志 RSS
+            tasks.append(('rss', url, source_name, 60))
         for key, (url, source_name) in self.science_rss.items():
-            all_news.extend(self._fetch_rss(url, source_name, max_items=60))
-        
-        # 7-10. ScienceDaily RSS
+            tasks.append(('rss', url, source_name, 60))
         for key, (url, source_name) in self.sciencedaily_rss.items():
-            all_news.extend(self._fetch_rss(url, source_name, max_items=40))
-        
-        # 11-13. 心理学专门源
+            tasks.append(('rss', url, source_name, 40))
         for key, (url, source_name) in self.psychology_rss.items():
-            all_news.extend(self._fetch_rss(url, source_name, max_items=40))
+            tasks.append(('rss', url, source_name, 40))
+        
+        # 并行抓取（最多 8 个线程）
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = {}
+            for task in tasks:
+                if task[0] == 'nature_web':
+                    fut = executor.submit(self._fetch_nature_news)
+                else:
+                    _, url, source_name, max_items = task
+                    fut = executor.submit(self._fetch_rss, url, source_name, max_items)
+                futures[fut] = task
+            
+            for future in as_completed(futures):
+                try:
+                    result = future.result(timeout=20)
+                    all_news.extend(result)
+                except Exception as e:
+                    task_info = futures[future]
+                    logger.error(f"获取 {task_info[2] or 'Nature News'} 失败: {e}")
         
         logger.info(f"总共获取 {len(all_news)} 条新闻标题")
         
@@ -166,7 +180,9 @@ class MultiSourceNewsFetcher:
         """
         try:
             logger.info(f"正在获取 {source_name} RSS...")
-            feed = feedparser.parse(rss_url)
+            # 先用 requests 带超时获取，再交给 feedparser 解析
+            rss_response = requests.get(rss_url, headers=self.headers, timeout=15)
+            feed = feedparser.parse(rss_response.content)
             
             news_list = []
             for entry in feed.entries[:max_items]:
