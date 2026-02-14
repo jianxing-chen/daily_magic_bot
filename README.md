@@ -1,6 +1,6 @@
-# 每日报告机器人 (Daily Report Bot)
+# 每日魔法报告 (Daily Magic Bot) ✨
 
-每日自动生成包含天气预报和新闻摘要的邮件报告，使用Gemini AI进行内容处理和生成。专为天文学与元认知方向的科研人员设计。
+每日自动生成包含天气预报和科学新闻摘要的邮件报告，使用 Gemini AI 进行智能筛选与内容生成。专为天文学与元认知/心理学方向的科研人员设计。
 
 ## 功能特点
 
@@ -8,13 +8,15 @@
   - 实时解析北京和济南的天气数据（weather.com.cn）
   - 天气状况与温度同行显示，信息密度更高
   - 提供日出日落时间、风力等级及天气预警信息
+  - 城市天气解析独立容错，单个城市失败不影响另一个
 
-- 🔬 **科学新闻（13 个专业新闻源）**：
+- 🔬 **科学新闻（13 个专业新闻源，并行抓取）**：
   - **Nature 系列**：Nature News (网页) + Nature / Nature Astronomy / Nature Reviews Psychology / Nature Communications (RSS)
   - **Science** 杂志 (RSS)
   - **ScienceDaily RSS**：Mind & Brain / Top Science / Top News / Space & Time
-  - **心理学专门源**：PsyPost / BPS Research Digest / PNAS Psychology
+  - **心理学专门源**：PsyPost / Neuroscience News / PNAS Psychology
   - 覆盖范围：去重后约 **300+ 条**新闻，过滤后保留最近 1 天内
+  - ⚡ **多线程并行抓取**（8 线程），新闻获取速度提升 ~5 倍
   
 - 🎯 **智能筛选（关键词相关性优先）**：
   - **天体物理**：球状星团、白矮星、毫秒脉冲星、中子星、脉冲星、恒星演化、星震学、变星、双星、恒星振荡、望远镜、X射线天文学、引力波、光谱、GAIA、TESS、Kepler
@@ -23,30 +25,35 @@
   - **按领域分组显示**：🔭 天体物理 → 🧠 元认知与心理学 → 📰 其他
   - 提供中英双语标题和 AI 生成的**倒金字塔结构**中文摘要
 
-- 🤖 **AI处理（Gemini 3 Flash）**：
-  - **极速架构**：采用 Unified Request 模式，每次运行仅需 **2次** AI调用
+- 🤖 **AI 处理（Gemini 3 Flash）**：
+  - **极速架构**：采用 Unified Request 模式，每次运行仅需 **2 次** AI 调用
   - **智能融合**：哈利波特角色开场白智能融合当日天气与科学大新闻
   - **批量处理**：一次性完成多条新闻的翻译与总结
+  - **指数退避重试**：自动处理 503/429 等临时错误（15s → 30s → 60s）
+  - **返回值校验**：AI 输出 schema 校验 + 降级兜底，确保邮件始终可发送
   - 筛选结果：15-30 条精选新闻
 
 - ✉️ **简洁邮件**：
-  - 响应式HTML设计，完美适配移动端
+  - 响应式 HTML 设计，完美适配移动端
   - **方正素雅**的设计风格，直线边框，灰色调配色
+  - 运行耗时统计，日志完整可追溯
 
 ## 项目结构
 
 ```
-1_DailyReportBot/
-├── config.py              # 配置管理
-├── weather_parser.py      # 天气数据解析
-├── news_fetcher.py        # 新闻获取
-├── gemini_processor.py    # Gemini AI处理
-├── email_sender.py        # 邮件发送
-├── main.py                # 主程序
-├── requirements.txt       # Python依赖
+daily_magic_bot/
+├── config.py              # 配置管理（环境变量 + 校验）
+├── weather_parser.py      # 天气数据解析（容错 + 默认值）
+├── news_fetcher.py        # 新闻获取（13源并行抓取）
+├── gemini_processor.py    # Gemini AI处理（重试 + 校验）
+├── email_sender.py        # 邮件发送（重试 + SSL/TLS）
+├── main.py                # 主程序（计时 + 多模式）
+├── requirements.txt       # Python依赖（版本锁定）
 ├── .env.template          # 环境变量模板
-├── .gitignore            # Git忽略文件
-└── README.md             # 本文件
+├── .github/workflows/     # GitHub Actions 自动化
+│   └── daily_report.yml   # 每日定时任务
+├── .gitignore             # Git忽略文件
+└── README.md              # 本文件
 ```
 
 ## 安装步骤
@@ -134,7 +141,7 @@ python main.py
 
 ## GitHub Actions 部署
 
-本项目设计为在GitHub Actions中运行。创建`.github/workflows/daily_report.yml`：
+本项目设计为在 GitHub Actions 中运行。配置文件位于 `.github/workflows/daily_report.yml`：
 
 ```yaml
 name: Daily Report
@@ -154,10 +161,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
       
@@ -194,11 +201,11 @@ jobs:
 
 ## 天气数据来源
 
-程序会自动从以下URL实时获取最新天气数据：
-- 北京：https://www.weather.com.cn/weather1d/101010100.shtml
-- 济南：https://www.weather.com.cn/weather1d/101120101.shtml
+程序会自动从以下 URL 实时获取最新天气数据：
+- 北京：https://www.weather.com.cn/weather1d/101011700.shtml
+- 济南：https://www.weather.com.cn/weather1d/101120107.shtml
 
-**注意**：项目文件夹中的HTML文件仅用于本地调试，程序运行时会直接从URL获取最新数据。
+程序运行时会直接从 URL 获取最新数据，无需本地缓存。
 
 ## 故障排查
 
@@ -208,18 +215,39 @@ jobs:
 - Gmail需要开启"允许不够安全的应用访问"或使用应用专用密码
 - 检查网络连接
 
-### 2. Gemini API调用失败
+### 2. Gemini API 调用失败
 
-- 确认API密钥正确
-- 检查API配额是否用尽
-- 确认网络能访问Google服务
+- 确认 API 密钥正确
+- 检查 API 配额是否用尽
+- 确认网络能访问 Google 服务
+- **503/429 错误**：程序会自动重试（15s → 30s → 60s），通常为 Gemini 高峰期临时过载
+- 若重试仍失败，会使用降级内容（默认问候语 + 前 15 条新闻），确保邮件可发送
 
 ### 3. 天气数据解析失败
-- 确认HTML文件存在且路径正确
-- 检查HTML文件是否为最新版本
+- 确认网络可访问 weather.com.cn
+- 单个城市解析失败不影响另一个城市（独立容错）
 - 查看日志确认具体错误
 
 ## 更新日志
+
+### v2.2 (2026-02-14)
+- 🛡️ **健壮性全面升级**：
+  - Gemini API 指数退避重试（15s → 30s → 60s），自动处理 503/429 临时错误
+  - AI 返回值 schema 校验，异常格式自动降级兜底
+  - 天气解析独立容错，单城市失败不影响另一个
+  - 配置校验补全（新增 SMTP 密码、收件人检查）
+- ⚡ **性能优化**：
+  - 新闻源并行抓取（8 线程 ThreadPoolExecutor），获取速度提升 ~5 倍
+  - RSS 抓取增加 15s 超时控制，避免单源阻塞
+  - 运行耗时统计，日志可追溯
+- 🧹 **代码清理**：
+  - 移除 3 个 v1 废弃方法（generate_weather_content 等），减少 ~115 行
+  - 统一日志配置（仅 main.py 初始化 logging），修复重复 basicConfig
+  - 修复 create_test_email CSS 转义错误、email_sender 测试代码引用错误
+  - 步骤编号统一为 [1/4]~[4/4]
+- 📦 **运维改善**：
+  - requirements.txt 依赖版本范围锁定
+  - GitHub Actions 升级至 checkout@v4 + setup-python@v5
 
 ### v2.1 (2025-12-31)
 - 🧠 **心理学源扩展**：新增 PsyPost、BPS Research Digest、PNAS Psychology 三个专业心理学新闻源
