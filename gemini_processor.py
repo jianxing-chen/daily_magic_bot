@@ -7,6 +7,7 @@ from typing import List, Dict
 import random
 import logging
 import json
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,44 @@ class GeminiProcessor:
         """
         self.client = genai.Client(api_key=api_key)
         self.model_name = 'gemini-3-flash-preview'
+        self.max_retries = 3
         logger.info("Gemini处理器初始化成功")
+    
+    def _call_with_retry(self, prompt: str, use_json: bool = True) -> str:
+        """
+        带指数退避重试的 Gemini API 调用
+        
+        对 503 (UNAVAILABLE) 和 429 (RESOURCE_EXHAUSTED) 等临时错误自动重试，
+        最多重试 self.max_retries 次，退避时间依次为 5s、15s、30s。
+        
+        Args:
+            prompt: 请求内容
+            use_json: 是否要求 JSON 格式返回
+            
+        Returns:
+            API 响应文本
+        """
+        config = {'response_mime_type': 'application/json'} if use_json else {}
+        
+        for attempt in range(self.max_retries):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
+                    config=config
+                )
+                return response.text
+            except Exception as e:
+                error_str = str(e)
+                is_retryable = any(code in error_str for code in ['503', '429', 'UNAVAILABLE', 'RESOURCE_EXHAUSTED'])
+                
+                if is_retryable and attempt < self.max_retries - 1:
+                    wait_time = [15, 30, 60][attempt]
+                    logger.warning(f"API 临时错误 (尝试 {attempt + 1}/{self.max_retries}): {error_str}")
+                    logger.warning(f"等待 {wait_time} 秒后重试...")
+                    time.sleep(wait_time)
+                else:
+                    raise  # 非临时错误或重试耗尽，抛出异常
     
     def generate_master_content(self, character_name: str, weather_info: Dict, news_list: List[Dict]) -> Dict:
         """
@@ -95,13 +133,9 @@ class GeminiProcessor:
 }}
 """
             
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config={'response_mime_type': 'application/json'}
-            )
+            response_text = self._call_with_retry(prompt, use_json=True)
             
-            result = json.loads(response.text)
+            result = json.loads(response_text)
             
             # 校验必要字段
             required_keys = ['greeting', 'advice_beijing', 'advice_jinan', 'selected_news']
@@ -174,13 +208,9 @@ class GeminiProcessor:
 ]
 """
             
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config={'response_mime_type': 'application/json'}
-            )
+            response_text = self._call_with_retry(prompt, use_json=True)
             
-            results = json.loads(response.text)
+            results = json.loads(response_text)
             
             # 校验返回列表格式
             if not isinstance(results, list):
