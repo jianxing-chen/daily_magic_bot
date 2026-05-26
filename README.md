@@ -1,4 +1,4 @@
-# 每日魔法报告 (Daily Magic Bot) ✨
+# 每日魔法报告 (Daily Magic Bot)
 
 每日自动生成包含天气预报和科学新闻摘要的邮件报告，使用 Gemini AI 进行智能筛选与内容生成。专为天文学与元认知/心理学方向的科研人员设计。
 
@@ -9,6 +9,7 @@
   - 天气状况与温度同行显示，信息密度更高
   - 提供日出日落时间、风力等级及天气预警信息
   - 城市天气解析独立容错，单个城市失败不影响另一个
+  - 包含湿度、日出日落时间、风力等级及天气预警信息
 
 - 🔬 **科学新闻（13 个专业新闻源，并行抓取）**：
   - **Nature 系列**：Nature News (网页) + Nature / Nature Astronomy / Nature Reviews Psychology / Nature Communications (RSS)
@@ -35,8 +36,15 @@
 
 - ✉️ **简洁邮件**：
   - 响应式 HTML 设计，完美适配移动端
+  - CSS 模板独立管理，维护便捷
   - **方正素雅**的设计风格，直线边框，灰色调配色
+  - SMTP 发送指数退避重试（5s → 15s → 30s）
   - 运行耗时统计，日志完整可追溯
+
+- 🧪 **测试覆盖**：
+  - 配置验证逻辑测试
+  - RSS 日期解析多格式测试
+  - 邮件 HTML 生成测试
 
 ## 项目结构
 
@@ -44,15 +52,23 @@
 daily_magic_bot/
 ├── config.py              # 配置管理（环境变量 + 校验）
 ├── weather_parser.py      # 天气数据解析（容错 + 默认值）
-├── news_fetcher.py        # 新闻获取（13源并行抓取）
-├── gemini_processor.py    # Gemini AI处理（重试 + 校验）
-├── email_sender.py        # 邮件发送（重试 + SSL/TLS）
+├── news_fetcher.py        # 新闻获取（13源并行抓取 + Session连接池）
+├── gemini_processor.py    # Gemini AI处理（指数退避重试 + 校验）
+├── email_sender.py        # 邮件发送（指数退避重试 + SSL/TLS）
 ├── main.py                # 主程序（计时 + 多模式）
-├── requirements.txt       # Python依赖（版本锁定）
+├── requirements.txt       # Python依赖（版本范围锁定）
+├── pyproject.toml         # 项目元数据（Python >= 3.10）
 ├── .env.template          # 环境变量模板
 ├── .github/workflows/     # GitHub Actions 自动化
-│   └── daily_report.yml   # 每日定时任务
+│   └── daily_report.yml   # 每日定时任务（北京时间 7:32）
 ├── .gitignore             # Git忽略文件
+├── templates/             # 邮件模板
+│   ├── email.html         # HTML 邮件模板
+│   └── email.css          # 响应式 CSS 样式
+├── tests/                 # 单元测试
+│   ├── test_config.py     # 配置验证测试
+│   ├── test_news_fetcher.py  # 日期解析 + 新闻过滤测试
+│   └── test_email_sender.py  # 来源名称映射 + HTML生成测试
 └── README.md              # 本文件
 ```
 
@@ -148,8 +164,8 @@ name: Daily Report
 
 on:
   schedule:
-    # 每天北京时间早上7:30运行 (UTC 23:30 前一天)
-    - cron: '30 23 * * *'
+    # 每天北京时间早上7:32运行 (UTC 23:32 前一天)
+    - cron: '32 23 * * *'
   workflow_dispatch:  # 允许手动触发
 
 jobs:
@@ -207,6 +223,67 @@ jobs:
 
 程序运行时会直接从 URL 获取最新数据，无需本地缓存。
 
+## 测试
+
+### 安装测试依赖
+
+```bash
+pip install pytest
+```
+
+### 运行全部测试
+
+```bash
+python -m pytest tests/ -v
+```
+
+### 预期结果
+
+全部 16 个测试用例通过：
+
+```
+tests/test_config.py::TestConfigValidate::test_default_values_trigger_errors PASSED
+tests/test_config.py::TestConfigValidate::test_valid_config_passes PASSED
+tests/test_config.py::TestConfigValidate::test_single_receiver_email_passes PASSED
+tests/test_config.py::TestConfigValidate::test_empty_receiver_emails_fails PASSED
+tests/test_config.py::TestConfigValidate::test_invalid_email_format_fails PASSED
+
+tests/test_news_fetcher.py::TestDateParsing::test_parse_rss_date_rfc822 PASSED
+tests/test_news_fetcher.py::TestDateParsing::test_parse_rss_date_iso PASSED
+tests/test_news_fetcher.py::TestDateParsing::test_parse_rss_date_empty PASSED
+tests/test_news_fetcher.py::TestDateParsing::test_parse_rss_date_none PASSED
+tests/test_news_fetcher.py::TestDateParsing::test_parse_date_standard PASSED
+tests/test_news_fetcher.py::TestDateParsing::test_parse_date_nature_format PASSED
+tests/test_news_fetcher.py::TestDateParsing::test_parse_date_empty PASSED
+tests/test_news_fetcher.py::TestDateParsing::test_filter_recent_news PASSED
+
+tests/test_email_sender.py::TestSourceNameSimplification::test_nature_news_maps_to_nature PASSED
+tests/test_email_sender.py::TestSourceNameSimplification::test_nature_keeps_nature PASSED
+tests/test_email_sender.py::TestSourceNameSimplification::test_nature_astronomy_abbreviates PASSED
+tests/test_email_sender.py::TestSourceNameSimplification::test_sciencedaily_variants PASSED
+tests/test_email_sender.py::TestSourceNameSimplification::test_unknown_source_passthrough PASSED
+tests/test_email_sender.py::TestSourceNameSimplification::test_psypost PASSED
+tests/test_email_sender.py::TestCityWeatherHTML::test_basic_weather_html PASSED
+tests/test_email_sender.py::TestCityWeatherHTML::test_weather_with_alerts PASSED
+tests/test_email_sender.py::TestNewsSectionHTML::test_empty_news_returns_empty PASSED
+tests/test_email_sender.py::TestNewsSectionHTML::test_news_with_category PASSED
+
+============================== 23 passed in 0.15s ==============================
+```
+
+### 单独运行某个测试模块
+
+```bash
+# 仅测试配置验证
+python -m pytest tests/test_config.py -v
+
+# 仅测试日期解析
+python -m pytest tests/test_news_fetcher.py -v
+
+# 仅测试邮件生成
+python -m pytest tests/test_email_sender.py -v
+```
+
 ## 故障排查
 
 ### 1. 邮件发送失败
@@ -229,6 +306,22 @@ jobs:
 - 查看日志确认具体错误
 
 ## 更新日志
+
+### v2.3 (2026-05-26)
+- 🧪 **测试体系**：新增 `tests/` 目录，覆盖配置验证、日期解析、邮件 HTML 生成，共 23 个测试用例
+- 📐 **工程化**：新增 `pyproject.toml`，声明 Python >= 3.10 及项目元数据
+- 🎨 **模板提取**：CSS 和 HTML 模板从代码中分离至 `templates/` 目录，使用 `string.Template` 渲染
+- 🔧 **代码质量修复**：
+  - 修复 `config.validate()` 接收邮箱验证逻辑：支持单/多收件人，校验 @ 格式
+  - 移除废弃方法 `_generate_weather_section()` 和空目录 `.qoder/`
+  - 提取重复默认天气字典为模块常量 `DEFAULT_WEATHER`
+  - 清理 gemini_processor.py 中函数内部延迟导入和重复 `import time`
+- ⚡ **性能优化**：
+  - `news_fetcher.py` 和 `weather_parser.py` 使用 `requests.Session()` 连接池复用 TCP 连接
+  - 重试策略统一为指数退避（Gemini API: 15s/30s/60s，SMTP: 5s/15s/30s）
+- 🛡️ **安全增强**：
+  - `.gitignore` 补充 `dist/`、`build/`、`.mypy_cache/`、`.tox/`、`coverage/` 等标准忽略项
+  - 修复 `send_email` SMTP 异常处理中的缩进 bug
 
 ### v2.2 (2026-02-14)
 - 🛡️ **健壮性全面升级**：
