@@ -1,25 +1,33 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light">
     <style>
         ${css}
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Greeting -->
         <div class="greeting">
-            <strong>${character}</strong>：<br><br>
-            ${greeting}
+            <div style="font-weight:700; font-size:18px; color:#1a2744; margin-bottom:10px; letter-spacing:0.5px;">
+                ${character}
+            </div>
+            <div style="color:#3a3528;">
+                ${greeting}
+            </div>
         </div>
 
+        <!-- Weather -->
         <h2 class="section-title">今日天气</h2>
-
         <div class="weather-container">
             ${beijing_weather}
             ${jinan_weather}
         </div>
 
+        <!-- News -->
         ${news_section}
     </div>
 </body>

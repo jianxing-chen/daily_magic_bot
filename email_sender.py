@@ -77,9 +77,9 @@ class EmailSender:
             <table style="width:100%; border-collapse:collapse;">
                 <tr>
                     <td style="text-align:center; padding:8px 0;">
-                        <span class="weather-condition" style="font-size:18px; font-weight:bold; color:#333;">{weather.get("weather", "未知")}</span>
-                        <span class="weather-divider" style="color:#ccc; margin:0 8px;">|</span>
-                        <span class="weather-temp" style="font-size:16px; color:#666;">{weather.get("temperature", "未知")}</span>
+                        <span class="weather-condition">{weather.get("weather", "未知")}</span>
+                        <span class="weather-divider">|</span>
+                        <span class="weather-temp">{weather.get("temperature", "未知")}</span>
                     </td>
                 </tr>
             </table>
