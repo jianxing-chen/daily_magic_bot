@@ -9,6 +9,9 @@ import logging
 import json
 import time
 
+from config import config
+from news_fetcher import MultiSourceNewsFetcher
+
 logger = logging.getLogger(__name__)
 
 
@@ -32,7 +35,7 @@ class GeminiProcessor:
         带指数退避重试的 Gemini API 调用
         
         对 503 (UNAVAILABLE) 和 429 (RESOURCE_EXHAUSTED) 等临时错误自动重试，
-        最多重试 self.max_retries 次，退避时间依次为 5s、15s、30s。
+        最多重试 self.max_retries 次，退避时间依次为 15s、30s、60s。
         
         Args:
             prompt: 请求内容
@@ -252,9 +255,6 @@ def process_daily_report(weather_data: Dict, news_list: List[Dict]) -> Dict:
     Returns:
         包含所有生成内容的字典
     """
-    from config import config
-    from news_fetcher import MultiSourceNewsFetcher
-    
     processor = GeminiProcessor(config.GEMINI_API_KEY)
     fetcher = MultiSourceNewsFetcher()
     
@@ -316,7 +316,6 @@ def process_daily_report(weather_data: Dict, news_list: List[Dict]) -> Dict:
                     
                     # 仅在抓取网页时暂停，避免爬虫请求过快
                     if not (source == 'Science' or source.startswith('ScienceDaily')):
-                        import time
                         time.sleep(0.5)
                     
                 except Exception as e:

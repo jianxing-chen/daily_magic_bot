@@ -21,7 +21,7 @@ class Config:
     SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
     SENDER_EMAIL = os.getenv('SENDER_EMAIL', 'your_email@gmail.com')
     SENDER_PASSWORD = os.getenv('SENDER_PASSWORD', 'your_app_password')
-    RECEIVER_EMAILS = os.getenv('RECEIVER_EMAILS', 'email1@example.com,email2@example.com').split(',')
+    RECEIVER_EMAILS = [e.strip() for e in os.getenv('RECEIVER_EMAILS', 'email1@example.com,email2@example.com').split(',') if e.strip()]
     
     # 天气数据来源（weather.com.cn）
     BEIJING_WEATHER_URL = 'https://www.weather.com.cn/weather1d/101011700.shtml'
@@ -39,19 +39,21 @@ class Config:
     def validate(cls):
         """验证配置"""
         errors = []
-        
+
         if cls.GEMINI_API_KEY == 'your_api_key_here':
             errors.append('请配置GEMINI_API_KEY')
-        
+
         if cls.SENDER_EMAIL == 'your_email@gmail.com':
             errors.append('请配置SENDER_EMAIL')
-        
+
         if cls.SENDER_PASSWORD == 'your_app_password':
             errors.append('请配置SENDER_PASSWORD')
-        
-        if not cls.RECEIVER_EMAILS or cls.RECEIVER_EMAILS == ['email1@example.com', 'email2@example.com']:
+
+        if not cls.RECEIVER_EMAILS or all(e.endswith('@example.com') for e in cls.RECEIVER_EMAILS):
             errors.append('请配置RECEIVER_EMAILS')
-        
+        elif not all('@' in e for e in cls.RECEIVER_EMAILS):
+            errors.append('RECEIVER_EMAILS 格式不正确，请检查邮箱地址')
+
         return errors
 
 # 导出配置实例

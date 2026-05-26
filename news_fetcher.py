@@ -19,7 +19,8 @@ class MultiSourceNewsFetcher:
     """多源科学新闻获取器"""
     
     def __init__(self):
-        self.headers = {
+        self.session = requests.Session()
+        self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.5',
@@ -27,7 +28,7 @@ class MultiSourceNewsFetcher:
             'DNT': '1',
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1'
-        }
+        })
         # Nature 网页抓取（仅 latest-news）
         self.nature_web = {
             'nature_news': 'https://www.nature.com/latest-news',
@@ -123,7 +124,7 @@ class MultiSourceNewsFetcher:
         """获取 Nature 最新新闻（网页抓取）"""
         try:
             logger.info("正在获取 Nature 最新新闻...")
-            response = requests.get(self.nature_web['nature_news'], headers=self.headers, timeout=15)
+            response = self.session.get(self.nature_web['nature_news'], timeout=15)
             soup = BeautifulSoup(response.text, 'html.parser')
             
             news_list = []
@@ -181,7 +182,7 @@ class MultiSourceNewsFetcher:
         try:
             logger.info(f"正在获取 {source_name} RSS...")
             # 先用 requests 带超时获取，再交给 feedparser 解析
-            rss_response = requests.get(rss_url, headers=self.headers, timeout=15)
+            rss_response = self.session.get(rss_url, timeout=15)
             feed = feedparser.parse(rss_response.content)
             
             news_list = []
@@ -300,7 +301,7 @@ class MultiSourceNewsFetcher:
         """
         try:
             logger.info(f"正在获取文章详情: {url}")
-            response = requests.get(url, headers=self.headers, timeout=15)
+            response = self.session.get(url, timeout=15)
             response.encoding = 'utf-8'
             soup = BeautifulSoup(response.text, 'html.parser')
             

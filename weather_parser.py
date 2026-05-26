@@ -10,22 +10,35 @@ import re
 
 logger = logging.getLogger(__name__)
 
+_session = requests.Session()
+_session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+})
+
+DEFAULT_WEATHER = {
+    'city': '未知',
+    'weather': '未知',
+    'temperature': '未知',
+    'current_temp': '未知',
+    'wind': '未知',
+    'sunrise': '未知',
+    'sunset': '未知',
+    'alerts': []
+}
+
 class WeatherParser:
     """weather.com.cn天气解析器"""
-    
+
     def __init__(self, url: str):
         self.url = url
         self.soup = None
         self._load_data()
-        
+
     def _load_data(self):
         """从URL加载HTML数据"""
         try:
             logger.info(f"正在获取天气数据: {self.url}")
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-            }
-            response = requests.get(self.url, headers=headers, timeout=10)
+            response = _session.get(self.url, timeout=10)
             response.encoding = 'utf-8'
             self.soup = BeautifulSoup(response.text, 'lxml')
             logger.info("成功获取并解析HTML数据")
@@ -132,29 +145,15 @@ class WeatherParser:
             
         except Exception as e:
             logger.error(f"解析天气数据失败: {e}")
-            return {
-                'city': '未知',
-                'weather': '未知',
-                'temperature': '未知',
-                'current_temp': '未知',
-                'wind': '未知',
-                'sunrise': '未知',
-                'sunset': '未知',
-                'alerts': []
-            }
+            return dict(DEFAULT_WEATHER)
 
 def parse_weather_files(beijing_url: str, jinan_url: str) -> Dict[str, Dict]:
     """
     解析北京和济南的天气
     """
-    default_weather = {
-        'city': '未知', 'weather': '未知', 'temperature': '未知',
-        'current_temp': '未知', 'wind': '未知',
-        'sunrise': '未知', 'sunset': '未知', 'alerts': []
-    }
     result = {
-        'beijing': dict(default_weather),
-        'jinan': dict(default_weather)
+        'beijing': dict(DEFAULT_WEATHER),
+        'jinan': dict(DEFAULT_WEATHER)
     }
     
     try:
