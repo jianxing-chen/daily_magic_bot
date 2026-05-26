@@ -26,7 +26,7 @@ class GeminiProcessor:
             api_key: Gemini API密钥
         """
         self.client = genai.Client(api_key=api_key)
-        self.model_name = 'gemini-3-flash-preview'
+        self.model_name = 'gemini-3.5-flash'
         self.max_retries = 3
         logger.info("Gemini处理器初始化成功")
     
@@ -112,9 +112,21 @@ class GeminiProcessor:
    1. **关键词相关性最重要**：标题或摘要中直接包含上述关键词的新闻优先级最高
    2. **领域专业源加权**：来自 Nature Astronomy、PsyPost、BPS Research Digest、PNAS Psychology 的相关新闻略微优先
    3. **日期次要**：同等相关性下，优先选择日期更近的新闻
-   4. 如有其他领域的重大发现也可包含，但总量控制在 15-30 条
-   
-   **请为每条新闻标注所属领域**：A（天体物理）、B（元认知/心理学）、C（其他）
+   4. 总量控制在 15-30 条，优先选择 A 和 B 领域，C 领域宁缺毋滥
+
+   **领域C（其他科学发现）的严格筛选标准**：
+   C 类只收录满足以下任一条件的新闻，**不满足的坚决不选**：
+   - 与日常生活直接相关的科学发现（如：健康医学、公共卫生、营养、睡眠、环境气候、新能源、AI应用、太空探索）
+   - 真正改变世界的重大突破（如：诺奖级成果、首次实现/发现、颠覆性技术、改变人类认知的基础科学突破）
+
+   **坚决排除**以下内容（即使来自 Nature/Science）：
+   - 常规材料化学研究、催化剂优化、电池微改进等工业化学
+   - 某蛋白结构解析、某基因测序、某化合物合成路线等常规分子生物学/化学
+   - 某矿床发现、某地质年代划分等纯地质学
+   - 纯工程学增量改进（如某合金强度提升 5%）
+   - 纯方法论论文（如"一种改进的 XX 算法"）
+
+   **请为每条新闻标注所属领域**：A（天体物理）、B（元认知/心理学）、C（其他重大发现）
 输入数据：
 【天气】
 - 北京：{beijing.get('weather', '未知')}，{beijing.get('temperature', '未知')}，{beijing.get('wind', '未知')}
