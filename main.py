@@ -94,9 +94,9 @@ def generate_daily_report():
 def create_test_email() -> str:
     """创建简单的测试邮件（不消耗API token）"""
     from datetime import datetime
-    
+
     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
+
     html = f"""
 <!DOCTYPE html>
 <html>
@@ -136,16 +136,105 @@ def create_test_email() -> str:
 </head>
 <body>
     <div class="container">
-        <h1>📧 邮件测试</h1>
-        <p class="success">✓ 邮件配置正常</p>
+        <h1>邮件测试</h1>
+        <p class="success">邮件配置正常</p>
         <p>如果您收到这封邮件，说明SMTP配置正确。</p>
         <p>时间: {current_time}</p>
     </div>
 </body>
 </html>
     """
-    
+
     return html
+
+
+def run_checks():
+    """预检模式：逐项检查所有依赖是否正常"""
+    import requests
+    import smtplib
+
+    results = []
+
+    def check(name):
+        """上下文管理器，收集检查结果"""
+        class _Check:
+            def __enter__(self):
+                return self
+            def __exit__(self, exc_type, exc_val, _tb):
+                if exc_type is None:
+                    results.append((name, True, ""))
+                    logger.info(f"  ✓ {name}")
+                else:
+                    msg = str(exc_val).split("\\n")[0]
+                    results.append((name, False, msg))
+                    logger.warning(f"  ✗ {name} — {msg}")
+                return True  # 吞掉异常，继续下一项
+        return _Check()
+
+    logger.info("=" * 60)
+    logger.info("预检模式：逐项检查所有依赖")
+    logger.info("=" * 60)
+
+    # 1. 配置
+    logger.info("\n[1] 配置检查")
+    with check("环境变量配置"):
+        errors = config.validate()
+        if errors:
+            raise ValueError("; ".join(errors))
+
+    # 2. 天气源
+    logger.info("\n[2] 天气数据源")
+    with check("weather.com.cn 可达"):
+        r = requests.get(config.BEIJING_WEATHER_URL, timeout=10, headers={
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        })
+        if r.status_code != 200:
+            raise ConnectionError(f"HTTP {r.status_code}")
+
+    # 3. 新闻源（抽检 Nature RSS）
+    logger.info("\n[3] 新闻数据源")
+    with check("Nature RSS 可达"):
+        r = requests.get("https://www.nature.com/nature.rss", timeout=15, headers={
+            'User-Agent': 'Mozilla/5.0'
+        })
+        if r.status_code != 200:
+            raise ConnectionError(f"HTTP {r.status_code}")
+
+    # 4. Gemini API
+    logger.info("\n[4] AI 服务")
+    with check("Gemini API 密钥有效"):
+        from google import genai
+        client = genai.Client(api_key=config.GEMINI_API_KEY)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents="用中文回复: OK",
+            config={'max_output_tokens': 10}
+        )
+        if not response.text:
+            raise ValueError("API 返回空响应")
+
+    # 5. SMTP
+    logger.info("\n[5] 邮件服务")
+    with check("SMTP 连接"):
+        if config.SMTP_PORT == 465:
+            server = smtplib.SMTP_SSL(config.SMTP_SERVER, config.SMTP_PORT, timeout=15)
+        else:
+            server = smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=15)
+            server.starttls()
+        server.login(config.SENDER_EMAIL, config.SENDER_PASSWORD)
+        server.quit()
+
+    # 汇总
+    logger.info("\n" + "=" * 60)
+    passed = sum(1 for _, ok, _ in results if ok)
+    total = len(results)
+    if passed == total:
+        logger.info(f"全部通过 ({passed}/{total})，可以放心运行")
+    else:
+        logger.warning(f"通过 {passed}/{total}，请修复上述问题后重试")
+    logger.info("=" * 60)
+
+    return passed == total
 
 
 def main():
@@ -154,14 +243,20 @@ def main():
     parser.add_argument('--test', action='store_true', help='测试模式（保存HTML到文件）')
     parser.add_argument('--no-send', action='store_true', help='不发送邮件（与--test配合使用）')
     parser.add_argument('--email-test', action='store_true', help='发送测试邮件（不消耗API token）')
+    parser.add_argument('--check', action='store_true', help='预检模式：检查配置/网络/API/SMTP 是否正常')
     args = parser.parse_args()
-    
+
     try:
+        # 预检模式
+        if args.check:
+            ok = run_checks()
+            return 0 if ok else 1
+
         # 验证配置
         if not validate_config():
             logger.error("配置验证失败，程序退出")
             return 1
-        
+
         # 邮件测试模式：发送简单测试邮件
         if args.email_test:
             logger.info("=" * 60)

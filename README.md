@@ -41,10 +41,7 @@
   - SMTP 发送指数退避重试（5s → 15s → 30s）
   - 运行耗时统计，日志完整可追溯
 
-- 🧪 **测试覆盖**：
-  - 配置验证逻辑测试
-  - RSS 日期解析多格式测试
-  - 邮件 HTML 生成测试
+- 🔍 **预检诊断**：`--check` 一键检查配置/网络/API/SMTP
 
 ## 项目结构
 
@@ -65,10 +62,6 @@ daily_magic_bot/
 ├── templates/             # 邮件模板
 │   ├── email.html         # HTML 邮件模板
 │   └── email.css          # 响应式 CSS 样式
-├── tests/                 # 单元测试
-│   ├── test_config.py     # 配置验证测试
-│   ├── test_news_fetcher.py  # 日期解析 + 新闻过滤测试
-│   └── test_email_sender.py  # 来源名称映射 + HTML生成测试
 └── README.md              # 本文件
 ```
 
@@ -125,33 +118,27 @@ RECEIVER_EMAILS=email1@example.com,email2@example.com
 
 ## 使用方法
 
-### 邮件发送测试（新功能）
+| 命令 | API token | 发送邮件 | 保存 HTML | 用途 |
+|------|:--:|:--:|:--:|------|
+| `python main.py --check` | ~10 | 否 | 否 | 预检：检查配置/网络/API/SMTP 是否正常 |
+| `python main.py --email-test` | 0 | 是 | 否 | 发送简单测试邮件，验证 SMTP 配置 |
+| `python main.py --test --no-send` | ~5k | 否 | 是 | 生成完整报告 HTML 保存到 /tmp，不发送 |
+| `python main.py --test` | ~5k | 是 | 是 | 生成完整报告并发送，同时保存 HTML 到 /tmp |
+| `python main.py` | ~5k | 是 | 否 | 正式运行，生成并发送（GitHub Actions 默认模式） |
 
-快速测试SMTP配置是否正确，发送一封简单的测试邮件（不消耗AI Token）：
+### 典型工作流
 
 ```bash
+# 首次配置后：预检环境
+python main.py --check
+
+# 验证邮件能收到
 python main.py --email-test
-```
 
-### 测试运行（不发送邮件）
-
-生成完整报告的HTML预览，保存在`/tmp`目录，不发送邮件：
-
-```bash
+# 预览报告内容（不发送）
 python main.py --test --no-send
-```
 
-### 测试发送完整报告
-
-生成并发送包含天气和新闻的完整报告：
-
-```bash
-python main.py --test
-```
-
-### 正式运行
-
-```bash
+# 确认无误，正式运行
 python main.py
 ```
 
@@ -223,67 +210,6 @@ jobs:
 
 程序运行时会直接从 URL 获取最新数据，无需本地缓存。
 
-## 测试
-
-### 安装测试依赖
-
-```bash
-pip install pytest
-```
-
-### 运行全部测试
-
-```bash
-python -m pytest tests/ -v
-```
-
-### 预期结果
-
-全部 16 个测试用例通过：
-
-```
-tests/test_config.py::TestConfigValidate::test_default_values_trigger_errors PASSED
-tests/test_config.py::TestConfigValidate::test_valid_config_passes PASSED
-tests/test_config.py::TestConfigValidate::test_single_receiver_email_passes PASSED
-tests/test_config.py::TestConfigValidate::test_empty_receiver_emails_fails PASSED
-tests/test_config.py::TestConfigValidate::test_invalid_email_format_fails PASSED
-
-tests/test_news_fetcher.py::TestDateParsing::test_parse_rss_date_rfc822 PASSED
-tests/test_news_fetcher.py::TestDateParsing::test_parse_rss_date_iso PASSED
-tests/test_news_fetcher.py::TestDateParsing::test_parse_rss_date_empty PASSED
-tests/test_news_fetcher.py::TestDateParsing::test_parse_rss_date_none PASSED
-tests/test_news_fetcher.py::TestDateParsing::test_parse_date_standard PASSED
-tests/test_news_fetcher.py::TestDateParsing::test_parse_date_nature_format PASSED
-tests/test_news_fetcher.py::TestDateParsing::test_parse_date_empty PASSED
-tests/test_news_fetcher.py::TestDateParsing::test_filter_recent_news PASSED
-
-tests/test_email_sender.py::TestSourceNameSimplification::test_nature_news_maps_to_nature PASSED
-tests/test_email_sender.py::TestSourceNameSimplification::test_nature_keeps_nature PASSED
-tests/test_email_sender.py::TestSourceNameSimplification::test_nature_astronomy_abbreviates PASSED
-tests/test_email_sender.py::TestSourceNameSimplification::test_sciencedaily_variants PASSED
-tests/test_email_sender.py::TestSourceNameSimplification::test_unknown_source_passthrough PASSED
-tests/test_email_sender.py::TestSourceNameSimplification::test_psypost PASSED
-tests/test_email_sender.py::TestCityWeatherHTML::test_basic_weather_html PASSED
-tests/test_email_sender.py::TestCityWeatherHTML::test_weather_with_alerts PASSED
-tests/test_email_sender.py::TestNewsSectionHTML::test_empty_news_returns_empty PASSED
-tests/test_email_sender.py::TestNewsSectionHTML::test_news_with_category PASSED
-
-============================== 23 passed in 0.15s ==============================
-```
-
-### 单独运行某个测试模块
-
-```bash
-# 仅测试配置验证
-python -m pytest tests/test_config.py -v
-
-# 仅测试日期解析
-python -m pytest tests/test_news_fetcher.py -v
-
-# 仅测试邮件生成
-python -m pytest tests/test_email_sender.py -v
-```
-
 ## 故障排查
 
 ### 1. 邮件发送失败
@@ -308,7 +234,7 @@ python -m pytest tests/test_email_sender.py -v
 ## 更新日志
 
 ### v2.3 (2026-05-26)
-- 🧪 **测试体系**：新增 `tests/` 目录，覆盖配置验证、日期解析、邮件 HTML 生成，共 23 个测试用例
+- 🔍 **预检诊断**：新增 `--check` 模式，一键检查 5 个环节（配置 / 天气源 / 新闻源 / Gemini API / SMTP）
 - 📐 **工程化**：新增 `pyproject.toml`，声明 Python >= 3.10 及项目元数据
 - 🎨 **模板提取**：CSS 和 HTML 模板从代码中分离至 `templates/` 目录，使用 `string.Template` 渲染
 - 🔧 **代码质量修复**：
