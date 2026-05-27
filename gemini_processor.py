@@ -110,7 +110,7 @@ class GeminiProcessor:
    
    **筛选原则**（按重要性排序）：
    1. **关键词相关性最重要**：标题或摘要中直接包含上述关键词的新闻优先级最高
-   2. **领域专业源加权**：来自 Nature Astronomy、PsyPost、BPS Research Digest、PNAS Psychology 的相关新闻略微优先
+   2. **领域专业源加权**：来自 Nature Astronomy、PsyPost、Neuroscience News、PNAS Psychology 的相关新闻略微优先
    3. **日期次要**：同等相关性下，优先选择日期更近的新闻
    4. 总量控制在 15-20 条，优先选择 A 和 B 领域，C 领域宁缺毋滥
 
