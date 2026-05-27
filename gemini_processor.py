@@ -191,23 +191,27 @@ class GeminiProcessor:
             处理后的列表 [{'title_en': '...', 'title_cn': '...', 'summary': '...', 'url': '...'}]
         """
         try:
-            # 构建Prompt
+            # 构建Prompt，标注每篇输入内容的长度
             articles_text = ""
             for i, art in enumerate(articles, 1):
-                # 限制每篇文章长度，避免token过多
-                content_preview = art['content'][:5000]
+                content = art['content'] or ''
+                content_preview = content[:3000]
+                content_len = len(content)
                 articles_text += f"""
 文章 {i}:
 标题: {art['title']}
+输入长度: {content_len} 字符
 内容: {content_preview}
 ---
 """
-            
+
             prompt = f"""请批量处理以下 {len(articles)} 篇科学新闻/论文。
 
 对于每一篇文章，请完成：
 1. 将标题翻译成中文（准确、专业，保持学术风格）
-2. 用中文总结文章核心内容，采用**倒金字塔结构**（先写最重要的发现/结论，再补充关键细节和背景）。总结应详实、全面且专业，涵盖核心发现、研究方法和科学意义。篇幅可稍长（约200-500字），确保读者无需阅读原文也能掌握文章全貌。
+2. 用中文总结文章核心内容，采用**倒金字塔结构**（先写最重要的发现/结论，再补充关键细节和背景）。总结篇幅根据输入内容长度分层：
+   - 输入 < 200 字符：摘要 100-200 字（根据可用信息简要概括，不编造）
+   - 输入 ≥ 200 字符：摘要 200-400 字（详实专业，涵盖核心发现、方法和科学意义）
 
 输入文章列表：
 {articles_text}
