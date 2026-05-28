@@ -107,6 +107,7 @@ SMTP_PORT=587
 # SMTP_PORT=465
 SENDER_EMAIL=your_email@gmail.com
 SENDER_PASSWORD=your_app_password
+SENDER_NAME=Daily Magic Bot  # 可选，发件人显示名称
 
 # 接收邮箱（用逗号分隔）
 RECEIVER_EMAILS=email1@example.com,email2@example.com
