@@ -6,6 +6,7 @@ import smtplib
 import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
 from pathlib import Path
 from string import Template
 from typing import Dict, List
@@ -21,20 +22,12 @@ _html_template = Template((_template_dir / 'email.html').read_text(encoding='utf
 class EmailSender:
     """邮件发送器"""
     
-    def __init__(self, smtp_server: str, smtp_port: int, sender_email: str, sender_password: str):
-        """
-        初始化邮件发送器
-        
-        Args:
-            smtp_server: SMTP服务器地址
-            smtp_port: SMTP端口
-            sender_email: 发件人邮箱
-            sender_password: 发件人密码
-        """
+    def __init__(self, smtp_server: str, smtp_port: int, sender_email: str, sender_password: str, sender_name: str = "Daily Magic Bot"):
         self.smtp_server = smtp_server
         self.smtp_port = smtp_port
         self.sender_email = sender_email
         self.sender_password = sender_password
+        self.sender_name = sender_name
     
     def create_html_email(self, weather_data: Dict, processed_data: Dict, news_data: List[Dict] = None) -> str:
         """
@@ -197,7 +190,7 @@ class EmailSender:
             try:
                 # 创建邮件
                 msg = MIMEMultipart('alternative')
-                msg['From'] = self.sender_email
+                msg['From'] = formataddr((self.sender_name, self.sender_email))
                 msg['To'] = ', '.join(receiver_emails)
                 msg['Subject'] = subject
                 

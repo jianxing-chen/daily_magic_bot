@@ -67,7 +67,8 @@ def generate_daily_report():
             config.SMTP_SERVER,
             config.SMTP_PORT,
             config.SENDER_EMAIL,
-            config.SENDER_PASSWORD
+            config.SENDER_PASSWORD,
+            config.SENDER_NAME
         )
         
         # 准备邮件数据
@@ -268,9 +269,10 @@ def main():
                 config.SMTP_SERVER,
                 config.SMTP_PORT,
                 config.SENDER_EMAIL,
-                config.SENDER_PASSWORD
+                config.SENDER_PASSWORD,
+                config.SENDER_NAME
             )
-            
+
             subject = f"邮件测试 - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
             logger.info(f"\n正在发送测试邮件到: {', '.join(config.RECEIVER_EMAILS)}")
             success = sender.send_email(config.RECEIVER_EMAILS, subject, html_content)

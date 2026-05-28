@@ -21,6 +21,7 @@ class Config:
     SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
     SENDER_EMAIL = os.getenv('SENDER_EMAIL', 'your_email@gmail.com')
     SENDER_PASSWORD = os.getenv('SENDER_PASSWORD', 'your_app_password')
+    SENDER_NAME = os.getenv('SENDER_NAME', 'Daily Magic Bot')
     RECEIVER_EMAILS = [e.strip() for e in os.getenv('RECEIVER_EMAILS', 'email1@example.com,email2@example.com').split(',') if e.strip()]
     
     # 天气数据来源（weather.com.cn）
