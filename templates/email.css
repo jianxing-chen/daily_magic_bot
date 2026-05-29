@@ -1,6 +1,6 @@
 /* ============================================
    Daily Magic Bot — Email Styles
-   Harry Potter themed, warm & magical palette
+   Fresh water-green / teal palette
    ============================================ */
 
 /* --- Base --- */
@@ -8,11 +8,11 @@ body {
     font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
     font-size: 16px;
     line-height: 1.65;
-    color: #2d2c2c;
+    color: #2d3a36;
     max-width: 760px;
     margin: 0 auto;
     padding: 24px;
-    background-color: #faf7f2;
+    background-color: #f0faf9;
     -webkit-font-smoothing: antialiased;
 }
 
@@ -21,31 +21,31 @@ body {
     background-color: #ffffff;
     padding: 44px 48px;
     border-radius: 6px;
-    border: 1px solid #e8e2d5;
+    border: 1px solid #cce8e4;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
 /* --- Greeting Card --- */
 .greeting {
     font-size: 16px;
-    color: #3a3528;
+    color: #134e4a;
     line-height: 1.8;
     margin-bottom: 40px;
     padding: 24px 28px;
-    background-color: #fdfaf3;
-    border-left: 4px solid #b8943a;
+    background-color: #f0fdfa;
+    border-left: 4px solid #14b8a6;
     border-radius: 0 4px 4px 0;
 }
 
 /* --- Section Title --- */
 .section-title {
     font-size: 20px;
-    color: #1a2744;
+    color: #0f766e;
     margin-bottom: 24px;
     margin-top: 44px;
     font-weight: 700;
     letter-spacing: 0.5px;
-    border-bottom: 2px solid #d4c5a0;
+    border-bottom: 2px solid #99f6e4;
     padding-bottom: 10px;
 }
 
@@ -58,9 +58,9 @@ body {
 
 .weather-card {
     flex: 1;
-    background: linear-gradient(180deg, #fdfaf3 0%, #ffffff 100%);
+    background: linear-gradient(180deg, #f0fdfa 0%, #ffffff 100%);
     padding: 24px 20px 20px;
-    border: 1px solid #e8e2d5;
+    border: 1px solid #ccfbf1;
     border-radius: 6px;
     text-align: center;
 }
@@ -68,21 +68,21 @@ body {
 .weather-city {
     font-size: 17px;
     font-weight: 700;
-    color: #1a2744;
+    color: #0f766e;
     margin-bottom: 14px;
     padding-bottom: 10px;
-    border-bottom: 1px solid #e8e2d5;
+    border-bottom: 1px solid #ccfbf1;
     letter-spacing: 0.5px;
 }
 
 .weather-condition {
     font-size: 18px;
     font-weight: 700;
-    color: #2d2c2c;
+    color: #2d3a36;
 }
 
 .weather-divider {
-    color: #c4b998;
+    color: #99e0d6;
     font-weight: 400;
     font-size: 16px;
     margin: 0 8px;
@@ -91,12 +91,12 @@ body {
 .weather-temp {
     font-size: 16px;
     font-weight: 400;
-    color: #5a5346;
+    color: #5a7d77;
 }
 
 .weather-detail {
     font-size: 13px;
-    color: #6b6356;
+    color: #6b807c;
     margin: 5px 0;
     line-height: 1.6;
 }
@@ -105,12 +105,12 @@ body {
 .weather-advice {
     margin-top: 14px;
     font-size: 13px;
-    color: #4a4336;
-    background-color: #fdfaf3;
+    color: #134e4a;
+    background-color: #f0fdfa;
     padding: 12px 14px;
     text-align: left;
     border-radius: 4px;
-    border: 1px solid #ece4d2;
+    border: 1px solid #ccece4;
     line-height: 1.6;
 }
 
@@ -118,15 +118,15 @@ body {
 .weather-alert {
     margin-top: 12px;
     padding: 10px 12px;
-    background-color: #fff8ec;
-    border-left: 3px solid #d4a017;
+    background-color: #ecfef7;
+    border-left: 3px solid #14b8a6;
     text-align: left;
     border-radius: 0 4px 4px 0;
 }
 
 .alert-item {
     font-size: 12px;
-    color: #6d4c00;
+    color: #0d6c63;
     margin: 4px 0;
     line-height: 1.5;
 }
@@ -139,12 +139,12 @@ body {
 
 .category-title {
     font-size: 16px;
-    color: #1a2744;
+    color: #0f766e;
     font-weight: 700;
     margin-bottom: 16px;
     padding: 10px 16px;
-    background-color: #f8f4ea;
-    border-left: 4px solid #b8943a;
+    background-color: #eefaf6;
+    border-left: 4px solid #14b8a6;
     border-radius: 0 4px 4px 0;
     letter-spacing: 0.3px;
 }
@@ -154,19 +154,19 @@ body {
     margin-bottom: 18px;
     padding: 18px 20px;
     background-color: #fefefe;
-    border: 1px solid #ece6d8;
+    border: 1px solid #ccf0e8;
     border-radius: 4px;
     transition: border-color 0.2s;
 }
 
 .news-item:hover {
-    border-color: #d4c5a0;
+    border-color: #99e0d6;
 }
 
 .news-title {
     font-size: 16px;
     font-weight: 700;
-    color: #1a2744;
+    color: #0f766e;
     margin-bottom: 8px;
     line-height: 1.5;
 }
@@ -177,28 +177,28 @@ body {
     font-size: 11px;
     text-decoration: none;
     vertical-align: middle;
-    color: #b8943a;
+    color: #14b8a6;
     opacity: 0.8;
     transition: opacity 0.2s;
 }
 
 .news-link-btn:hover {
     opacity: 1;
-    color: #8b6914;
+    color: #0d6c63;
     text-decoration: underline;
 }
 
 .news-date {
     margin-left: 8px;
     font-size: 12px;
-    color: #9b8e78;
+    color: #9bb8b0;
     font-weight: 400;
     vertical-align: middle;
 }
 
 .news-title-en {
     font-size: 13px;
-    color: #6b6356;
+    color: #6b807c;
     margin-bottom: 10px;
     font-style: italic;
     line-height: 1.5;
@@ -206,7 +206,7 @@ body {
 
 .news-summary {
     font-size: 14px;
-    color: #3a3528;
+    color: #2d3a36;
     line-height: 1.7;
     margin-bottom: 4px;
 }
