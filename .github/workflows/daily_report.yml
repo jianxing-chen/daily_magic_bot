@@ -33,6 +33,7 @@ jobs:
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+          SENDER_NAME: ${{ secrets.SENDER_NAME }}
           RECEIVER_EMAILS: ${{ secrets.RECEIVER_EMAILS }}
         run: |
           python main.py
