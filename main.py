@@ -201,21 +201,8 @@ def run_checks():
         if r.status_code != 200:
             raise ConnectionError(f"HTTP {r.status_code}")
 
-    # 4. Gemini API
-    logger.info("\n[4] AI 服务")
-    with check("Gemini API 密钥有效"):
-        from google import genai
-        client = genai.Client(api_key=config.GEMINI_API_KEY)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents="用中文回复: OK",
-            config={'max_output_tokens': 10}
-        )
-        if not response.text:
-            raise ValueError("API 返回空响应")
-
-    # 5. SMTP
-    logger.info("\n[5] 邮件服务")
+    # 4. SMTP（AI 服务不再预检：运行时多模型回退链自带探活，预检只会额外消耗 RPM）
+    logger.info("\n[4] 邮件服务")
     with check("SMTP 连接"):
         if config.SMTP_PORT == 465:
             server = smtplib.SMTP_SSL(config.SMTP_SERVER, config.SMTP_PORT, timeout=15)

@@ -26,45 +26,65 @@ class GeminiProcessor:
             api_key: Gemini API密钥
         """
         self.client = genai.Client(api_key=api_key)
-        self.model_name = 'gemini-3.5-flash'
-        self.max_retries = 3
+        # 模型回退链：首选 3.5-flash，高峰 503 时依次回退到 3-flash-preview、2.5-pro
+        self.models = ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-pro']
+        self.max_retries = 2
         logger.info("Gemini处理器初始化成功")
     
     def _call_with_retry(self, prompt: str, use_json: bool = True) -> str:
         """
-        带指数退避重试的 Gemini API 调用
-        
-        对 503 (UNAVAILABLE) 和 429 (RESOURCE_EXHAUSTED) 等临时错误自动重试，
-        最多重试 self.max_retries 次，退避时间依次为 15s、30s、60s。
-        
+        带指数退避重试 + 多模型回退的 Gemini API 调用
+
+        遍历模型回退链，对每个模型重试 self.max_retries 次（退避 30s/60s）。
+        临时错误（503/429/UNAVAILABLE/RESOURCE_EXHAUSTED）重试耗尽后切换下一个模型；
+        非临时错误（如 400/认证失败/模型不存在）立即抛出，不做无意义回退。
+        全部模型重试耗尽后抛出最后一次异常，由上层降级处理。
+
         Args:
             prompt: 请求内容
             use_json: 是否要求 JSON 格式返回
-            
+
         Returns:
             API 响应文本
         """
         config = {'response_mime_type': 'application/json'} if use_json else {}
-        
-        for attempt in range(self.max_retries):
-            try:
-                response = self.client.models.generate_content(
-                    model=self.model_name,
-                    contents=prompt,
-                    config=config
-                )
-                return response.text
-            except Exception as e:
-                error_str = str(e)
-                is_retryable = any(code in error_str for code in ['503', '429', 'UNAVAILABLE', 'RESOURCE_EXHAUSTED'])
-                
-                if is_retryable and attempt < self.max_retries - 1:
-                    wait_time = [15, 30, 60][attempt]
-                    logger.warning(f"API 临时错误 (尝试 {attempt + 1}/{self.max_retries}): {error_str}")
-                    logger.warning(f"等待 {wait_time} 秒后重试...")
-                    time.sleep(wait_time)
-                else:
-                    raise  # 非临时错误或重试耗尽，抛出异常
+        last_error = None
+
+        for model_idx, model_name in enumerate(self.models):
+            for attempt in range(self.max_retries):
+                try:
+                    response = self.client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=config
+                    )
+                    return response.text
+                except Exception as e:
+                    error_str = str(e)
+                    last_error = e
+                    is_retryable = any(code in error_str for code in ['503', '429', 'UNAVAILABLE', 'RESOURCE_EXHAUSTED'])
+
+                    # 非临时错误（400/认证失败/模型不存在等）不回退，直接抛出
+                    if not is_retryable:
+                        raise
+
+                    # 临时错误：还有重试次数 → 退避后重试当前模型
+                    if attempt < self.max_retries - 1:
+                        wait_time = [30, 60][attempt]
+                        logger.warning(f"[{model_name}] API 临时错误 (尝试 {attempt + 1}/{self.max_retries}): {error_str}")
+                        logger.warning(f"等待 {wait_time} 秒后重试...")
+                        time.sleep(wait_time)
+                    else:
+                        # 当前模型重试耗尽
+                        if model_idx < len(self.models) - 1:
+                            next_model = self.models[model_idx + 1]
+                            logger.warning(f"[{model_name}] 重试耗尽，回退到下一个模型: {next_model}")
+                        else:
+                            logger.error(f"[{model_name}] 所有模型重试耗尽，抛出异常")
+                            raise
+
+        # 理论上不会走到这里（上面循环会 return 或 raise）
+        raise last_error
     
     def generate_master_content(self, character_name: str, weather_info: Dict, news_list: List[Dict]) -> Dict:
         """
@@ -170,7 +190,10 @@ class GeminiProcessor:
             return result
             
         except Exception as e:
-            logger.error(f"生成主要内容失败: {e}")
+            logger.error("=" * 60)
+            logger.error("⚠️ AI 内容生成彻底失败，本次邮件将使用兜底默认值（无真实 AI 问候/筛选）")
+            logger.error(f"最后错误: {e}")
+            logger.error("=" * 60)
             return {
                 "greeting": f"{character_name}祝您早安！今天的天气真不错！",
                 "advice_beijing": "请注意天气变化。",
@@ -250,7 +273,10 @@ class GeminiProcessor:
             return processed_news
             
         except Exception as e:
-            logger.error(f"批量处理新闻失败: {e}")
+            logger.error("=" * 60)
+            logger.error("⚠️ 新闻批量处理彻底失败，摘要将显示为占位文本（无真实 AI 翻译/摘要）")
+            logger.error(f"最后错误: {e}")
+            logger.error("=" * 60)
             # 降级处理：返回原始数据
             return [{
                 'title_en': art['title'],
