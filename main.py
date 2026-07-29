@@ -13,12 +13,10 @@ from weather_parser import parse_weather_files
 from news_fetcher import fetch_all_news
 from gemini_processor import process_daily_report
 from email_sender import EmailSender
+from logging_config import setup_logging
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+setup_logging(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
