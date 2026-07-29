@@ -5,6 +5,7 @@ Gemini AI处理模块
 from google import genai
 from google.genai import errors as genai_errors
 from typing import List, Dict
+import asyncio
 import random
 import logging
 import json
@@ -12,6 +13,7 @@ import time
 
 from config import config
 from news_fetcher import MultiSourceNewsFetcher
+from async_news_fetcher import fetch_articles_async
 
 logger = logging.getLogger(__name__)
 
@@ -364,56 +366,42 @@ def process_daily_report(
         # 3. 处理选中的新闻
         selected_news = master_content.get('selected_news', [])
         logger.info(f"AI选中了 {len(selected_news)} 条新闻")
-        
-        articles_to_process = []
+
+        # 构建待抓取文章列表
+        articles_to_fetch = []
         for item in selected_news:
             idx = item.get('index') if isinstance(item, dict) else item
             category = item.get('category', 'C') if isinstance(item, dict) else 'C'
             if isinstance(idx, int) and 0 <= idx - 1 < len(news_list):
                 news = news_list[idx - 1]
-                try:
-                    # 根据来源决定获取内容的方式
-                    # ScienceDaily 和 Science RSS 直接使用 RSS 中的摘要，避免抓取失败
-                    source = news.get('source', '')
-                    if source == 'Science' or source.startswith('ScienceDaily'):
-                        logger.info(f"使用RSS摘要作为内容: {news['title']}")
-                        content = news.get('description', '')
-                        if not content:
-                            content = news['title']  # 如果没有摘要，仅使用标题
-                    else:
-                        # 其他来源（如 Nature）尝试抓取全文
-                        article = fetcher.fetch_article_content(news['url'])
-                        content = article['full_text'] or article['abstract'] or "无内容"
-                    
-                    articles_to_process.append({
-                        'title': news['title'],
-                        'url': news['url'],
-                        'content': content,
-                        'date': news.get('date', ''),  # 保留日期
-                        'source': source,  # 保留来源
-                        'category': category  # 保留领域分类
-                    })
-                    
-                    # 仅在抓取网页时暂停，避免爬虫请求过快
-                    if not (source == 'Science' or source.startswith('ScienceDaily')):
-                        time.sleep(ARTICLE_FETCH_DELAY)
-                    
-                except Exception as e:
-                    logger.error(f"获取文章内容失败 {news['title']}: {e}")
-                    continue
-        
+                articles_to_fetch.append({
+                    'title': news['title'],
+                    'url': news['url'],
+                    'description': news.get('description', ''),
+                    'date': news.get('date', ''),
+                    'source': news.get('source', ''),
+                    'category': category
+                })
+
+        # 异步抓取文章内容
+        articles_to_process = []
+        if articles_to_fetch:
+            logger.info(f"正在异步抓取 {len(articles_to_fetch)} 篇文章详情...")
+            articles_to_process = asyncio.run(fetch_articles_async(articles_to_fetch))
+            logger.info(f"  - 异步抓取完成，获取 {len(articles_to_process)} 篇")
+
         # 4. 批量处理新闻内容
         if articles_to_process:
             logger.info("正在批量处理新闻内容...")
             processed = processor.process_news_batch(articles_to_process)
-            
+
             # 添加日期和来源信息到结果中
             for i, item in enumerate(processed):
                 if i < len(articles_to_process):
                     item['date'] = articles_to_process[i].get('date', '')
                     item['source'] = articles_to_process[i].get('source', '')
                     item['category'] = articles_to_process[i].get('category', 'C')
-            
+
             result['processed_news'] = processed
             
         logger.info("所有AI处理完成")
