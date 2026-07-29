@@ -63,8 +63,9 @@ class EmailSender:
     def _generate_city_weather(self, city_name: str, weather: Dict, advice: str) -> str:
         """生成单个城市的天气HTML"""
         alerts = weather.get('alerts', [])
-        
-        html = f'''
+
+        # 构建基础信息
+        base_info = f'''
         <div class="weather-card">
             <div class="weather-city">{city_name}</div>
             <table style="width:100%; border-collapse:collapse;">
@@ -79,75 +80,95 @@ class EmailSender:
             <div class="weather-detail">{weather.get("wind", "未知")}</div>
             <div class="weather-detail">🌅 {weather.get("sunrise", "未知")} | 🌇 {weather.get("sunset", "未知")}</div>
             '''
-        
-        # 添加天气预警
+
+        # 可选部分：天气预警
+        alert_html = ''
         if alerts:
-            html += '<div class="weather-alert">'
-            for alert in alerts:
-                html += f'<div class="alert-item">⚠️ {alert}</div>'
-            html += '</div>'
-        
-        # 添加穿衣建议
-        if advice:
-            html += f'<div class="weather-advice">💡 {advice}</div>'
-        
-        html += '</div>'
-        return html
+            alert_items = ''.join(f'<div class="alert-item">⚠️ {alert}</div>' for alert in alerts)
+            alert_html = f'<div class="weather-alert">{alert_items}</div>'
+
+        # 可选部分：穿衣建议
+        advice_html = f'<div class="weather-advice">💡 {advice}</div>' if advice else ''
+
+        # 组装并关闭卡片
+        return base_info + alert_html + advice_html + '</div>'
     
     def _generate_news_section(self, news_list: List[Dict]) -> str:
         """生成新闻部分的HTML（按领域分组）"""
         if not news_list:
             return ""
-        
+
         # 按领域分组
+        categories = self._group_news_by_category(news_list)
+
+        html = '<h2 class="section-title">科学新闻</h2>\n'
+
+        # 按 A、B、C 顺序输出
+        for cat_data in categories:
+            html += f'<div class="category-section">\n'
+            html += f'<div class="category-title">{cat_data["title"]} ({len(cat_data["items"])})</div>\n'
+
+            for news in cat_data['items']:
+                html += self._render_news_item(news)
+
+            html += '</div>\n'
+
+        return html
+
+    def _group_news_by_category(self, news_list: List[Dict]) -> List[Dict]:
+        """按领域分组新闻
+
+        Args:
+            news_list: 新闻列表
+
+        Returns:
+            非空分类列表，按 A、B、C 顺序
+        """
         categories = {
             'A': {'title': '🔭 天体物理', 'items': []},
             'B': {'title': '🧠 元认知与心理学', 'items': []},
             'C': {'title': '📰 其他科学发现', 'items': []}
         }
-        
+
         for news in news_list:
             category = news.get('category', 'C')
             if category not in categories:
                 category = 'C'
             categories[category]['items'].append(news)
-        
-        html = '<h2 class="section-title">科学新闻</h2>\n'
-        
-        # 按 A、B、C 顺序输出
-        for cat_key in ['A', 'B', 'C']:
-            cat_data = categories[cat_key]
-            if not cat_data['items']:
-                continue
-            
-            html += f'<div class="category-section">\n'
-            html += f'<div class="category-title">{cat_data["title"]} ({len(cat_data["items"])})</div>\n'
-            
-            for news in cat_data['items']:
-                title_cn = news.get('title_cn', news.get('title', '未知标题'))
-                title_en = news.get('title_en', news.get('title', ''))
-                url = news.get('url', '#')
-                summary = news.get('summary', '')
-                date = news.get('date', '')
-                source = news.get('source', '')
-                
-                source_short = self._simplify_source_name(source)
-                
-                html += f'''
+
+        # 返回非空分类
+        return [cat for cat in categories.values() if cat['items']]
+
+    def _render_news_item(self, news: Dict) -> str:
+        """渲染单条新闻的 HTML
+
+        Args:
+            news: 新闻数据
+
+        Returns:
+            HTML 字符串
+        """
+        title_cn = news.get('title_cn', news.get('title', '未知标题'))
+        title_en = news.get('title_en', news.get('title', ''))
+        url = news.get('url', '#')
+        summary = news.get('summary', '')
+        date = news.get('date', '')
+        source = news.get('source', '')
+
+        source_short = self._simplify_source_name(source)
+        source_suffix = f', {source_short}' if source_short else ''
+
+        return f'''
             <div class="news-item">
                 <div class="news-title">
                     {title_cn}
                     <a href="{url}" class="news-link-btn" target="_blank">🔗</a>
                     <span class="news-date">{date}</span>
                 </div>
-                <div class="news-title-en">{title_en}{', ' + source_short if source_short else ''}</div>
+                <div class="news-title-en">{title_en}{source_suffix}</div>
                 <div class="news-summary">{summary}</div>
             </div>
             '''
-            
-            html += '</div>\n'
-        
-        return html
     
     def _simplify_source_name(self, source: str) -> str:
         """简化新闻来源名称"""
