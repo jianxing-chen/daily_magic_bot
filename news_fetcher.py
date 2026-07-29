@@ -9,7 +9,6 @@ import logging
 from typing import List, Dict
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import time
 import re
 
 logger = logging.getLogger(__name__)
@@ -22,7 +21,6 @@ MAX_SCIENCEDAILY_ITEMS = 40   # ScienceDaily/心理学源最大条数
 MAX_CONTENT_LENGTH = 5000     # 单篇文章全文最大长度（字符）
 REQUEST_TIMEOUT = 15          # HTTP 请求超时（秒）
 FETCH_TIMEOUT = 20            # 单源并行任务超时（秒）
-NATURE_FETCH_DELAY = 0.5      # Nature 文章抓取间隔（秒）
 
 
 class MultiSourceNewsFetcher:
@@ -299,107 +297,6 @@ class MultiSourceNewsFetcher:
         
         return filtered
     
-    def fetch_article_content(self, url: str) -> Dict:
-        """
-        获取文章详细内容
-        
-        Args:
-            url: 文章URL
-            
-        Returns:
-            包含 title, abstract, full_text 的字典
-        """
-        try:
-            logger.info(f"正在获取文章详情: {url}")
-            response = self.session.get(url, timeout=REQUEST_TIMEOUT)
-            response.encoding = 'utf-8'
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # 根据不同网站使用不同的解析策略
-            if 'nature.com' in url:
-                return self._parse_nature_article(soup, url)
-            elif 'sciencedaily.com' in url:
-                return self._parse_sciencedaily_article(soup, url)
-            elif 'science.org' in url:
-                return self._parse_science_article(soup, url)
-            else:
-                return {'title': '未知', 'abstract': '', 'full_text': '', 'url': url}
-                
-        except Exception as e:
-            logger.error(f"获取文章详情失败 {url}: {e}")
-            return {'title': '未知', 'abstract': '', 'full_text': '', 'url': url}
-    
-    def _parse_nature_article(self, soup: BeautifulSoup, url: str) -> Dict:
-        """解析 Nature 文章"""
-        title_elem = soup.select_one('h1.c-article-title, h1')
-        title = title_elem.get_text(strip=True) if title_elem else '未知'
-        
-        abstract_elem = soup.select_one('div#Abs1-content, div.c-article-section__content')
-        abstract = abstract_elem.get_text(strip=True) if abstract_elem else ''
-        
-        # 获取文章主体
-        body_elem = soup.select_one('div.c-article-body, article')
-        if body_elem:
-            for script in body_elem(['script', 'style']):
-                script.decompose()
-            full_text = body_elem.get_text(separator='\n', strip=True)
-        else:
-            full_text = abstract
-        
-        return {
-            'title': title,
-            'abstract': abstract,
-            'full_text': full_text[:MAX_CONTENT_LENGTH],  # 限制长度
-            'url': url
-        }
-    
-    def _parse_sciencedaily_article(self, soup: BeautifulSoup, url: str) -> Dict:
-        """解析 ScienceDaily 文章"""
-        title_elem = soup.select_one('#headline')
-        title = title_elem.get_text(strip=True) if title_elem else '未知'
-        
-        intro_elem = soup.select_one('#abstract')
-        abstract = intro_elem.get_text(strip=True) if intro_elem else ''
-        
-        story_elem = soup.select_one('#story_text')
-        if story_elem:
-            for script in story_elem(['script', 'style']):
-                script.decompose()
-            full_text = story_elem.get_text(separator='\n', strip=True)
-        else:
-            full_text = abstract
-        
-        return {
-            'title': title,
-            'abstract': abstract,
-            'full_text': full_text[:MAX_CONTENT_LENGTH],
-            'url': url
-        }
-    
-    def _parse_science_article(self, soup: BeautifulSoup, url: str) -> Dict:
-        """解析 Science 文章"""
-        title_elem = soup.select_one('h1.article__headline, h1')
-        title = title_elem.get_text(strip=True) if title_elem else '未知'
-        
-        abstract_elem = soup.select_one('div.article__summary, p.article__teaser')
-        abstract = abstract_elem.get_text(strip=True) if abstract_elem else ''
-        
-        body_elem = soup.select_one('div.article__body, article')
-        if body_elem:
-            for script in body_elem(['script', 'style']):
-                script.decompose()
-            full_text = body_elem.get_text(separator='\n', strip=True)
-        else:
-            full_text = abstract
-        
-        return {
-            'title': title,
-            'abstract': abstract,
-            'full_text': full_text[:MAX_CONTENT_LENGTH],
-            'url': url
-        }
-
-
 def fetch_all_news() -> List[Dict]:
     """
     获取所有新闻源的标题

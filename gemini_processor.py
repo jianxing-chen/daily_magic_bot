@@ -12,7 +12,6 @@ import json
 import time
 
 from config import config
-from news_fetcher import MultiSourceNewsFetcher
 from async_news_fetcher import fetch_articles_async
 
 logger = logging.getLogger(__name__)
@@ -20,7 +19,6 @@ logger = logging.getLogger(__name__)
 # --- 处理配置常量 ---
 MAX_CONTENT_LENGTH = 5000      # 单篇文章最大内容长度（字符）
 MAX_CONTENT_PREVIEW = 3000     # 发送给 AI 的内容预览长度（字符）
-ARTICLE_FETCH_DELAY = 0.5      # Nature 文章抓取间隔（秒）
 RETRYABLE_STATUS_CODES = {503, 429}  # 可重试的 HTTP 状态码
 RETRYABLE_STATUS_NAMES = {'UNAVAILABLE', 'RESOURCE_EXHAUSTED'}  # 可重试的 gRPC 状态名
 
@@ -321,8 +319,7 @@ class GeminiProcessor:
 def process_daily_report(
     weather_data: Dict,
     news_list: List[Dict],
-    processor: 'GeminiProcessor' = None,
-    fetcher: 'MultiSourceNewsFetcher' = None
+    processor: 'GeminiProcessor' = None
 ) -> Dict:
     """
     统一处理每日报告的所有AI内容
@@ -331,14 +328,12 @@ def process_daily_report(
         weather_data: 天气数据
         news_list: 原始新闻列表（包含 title, url, source, date）
         processor: 可选的 GeminiProcessor 实例（用于测试时注入 mock）
-        fetcher: 可选的 MultiSourceNewsFetcher 实例（用于测试时注入 mock）
 
     Returns:
         包含所有生成内容的字典
     """
     # 使用注入的实例或创建新实例
     processor = processor or GeminiProcessor(config.GEMINI_API_KEY)
-    fetcher = fetcher or MultiSourceNewsFetcher()
     
     result = {
         'greeting': '',

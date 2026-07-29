@@ -3,6 +3,7 @@
 加载环境变量和应用配置
 """
 import os
+import re
 from dotenv import load_dotenv
 from pathlib import Path
 from typing import List
@@ -10,6 +11,9 @@ from typing import List
 # 加载.env文件
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
+
+# 邮箱格式正则（RFC 5322 简化版）
+EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 
 
 class Config:
@@ -57,14 +61,18 @@ class Config:
 
         if self.SENDER_EMAIL == 'your_email@gmail.com':
             errors.append('请配置SENDER_EMAIL')
+        elif not EMAIL_PATTERN.match(self.SENDER_EMAIL):
+            errors.append(f'SENDER_EMAIL 格式不正确: {self.SENDER_EMAIL}')
 
         if self.SENDER_PASSWORD == 'your_app_password':
             errors.append('请配置SENDER_PASSWORD')
 
         if not self.RECEIVER_EMAILS or all(e.endswith('@example.com') for e in self.RECEIVER_EMAILS):
             errors.append('请配置RECEIVER_EMAILS')
-        elif not all('@' in e for e in self.RECEIVER_EMAILS):
-            errors.append('RECEIVER_EMAILS 格式不正确，请检查邮箱地址')
+        else:
+            invalid = [e for e in self.RECEIVER_EMAILS if not EMAIL_PATTERN.match(e)]
+            if invalid:
+                errors.append(f'RECEIVER_EMAILS 包含无效邮箱: {", ".join(invalid)}')
 
         return errors
 
