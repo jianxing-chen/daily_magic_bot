@@ -316,19 +316,27 @@ class GeminiProcessor:
             } for art in articles]
 
 
-def process_daily_report(weather_data: Dict, news_list: List[Dict]) -> Dict:
+def process_daily_report(
+    weather_data: Dict,
+    news_list: List[Dict],
+    processor: 'GeminiProcessor' = None,
+    fetcher: 'MultiSourceNewsFetcher' = None
+) -> Dict:
     """
     统一处理每日报告的所有AI内容
-    
+
     Args:
         weather_data: 天气数据
         news_list: 原始新闻列表（包含 title, url, source, date）
-        
+        processor: 可选的 GeminiProcessor 实例（用于测试时注入 mock）
+        fetcher: 可选的 MultiSourceNewsFetcher 实例（用于测试时注入 mock）
+
     Returns:
         包含所有生成内容的字典
     """
-    processor = GeminiProcessor(config.GEMINI_API_KEY)
-    fetcher = MultiSourceNewsFetcher()
+    # 使用注入的实例或创建新实例
+    processor = processor or GeminiProcessor(config.GEMINI_API_KEY)
+    fetcher = fetcher or MultiSourceNewsFetcher()
     
     result = {
         'greeting': '',

@@ -21,13 +21,32 @@ _html_template = Template((_template_dir / 'email.html').read_text(encoding='utf
 
 class EmailSender:
     """邮件发送器"""
-    
-    def __init__(self, smtp_server: str, smtp_port: int, sender_email: str, sender_password: str, sender_name: str = "Daily Magic Bot"):
+
+    def __init__(
+        self,
+        smtp_server: str,
+        smtp_port: int,
+        sender_email: str,
+        sender_password: str,
+        sender_name: str = "Daily Magic Bot",
+        template_dir: Path = None
+    ):
+        """初始化邮件发送器
+
+        Args:
+            smtp_server: SMTP 服务器地址
+            smtp_port: SMTP 端口
+            sender_email: 发件人邮箱
+            sender_password: 发件人密码/授权码
+            sender_name: 发件人显示名称
+            template_dir: 可选的模板目录路径（用于测试时注入）
+        """
         self.smtp_server = smtp_server
         self.smtp_port = smtp_port
         self.sender_email = sender_email
         self.sender_password = sender_password
         self.sender_name = sender_name
+        self.template_dir = template_dir or _template_dir
     
     def create_html_email(self, weather_data: Dict, processed_data: Dict, news_data: List[Dict] = None) -> str:
         """
