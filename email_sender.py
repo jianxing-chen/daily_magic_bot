@@ -8,15 +8,14 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
 from pathlib import Path
-from string import Template
 from typing import Dict, List
 import logging
 
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
 logger = logging.getLogger(__name__)
 
-_template_dir = Path(__file__).parent / 'templates'
-_css = (_template_dir / 'email.css').read_text(encoding='utf-8')
-_html_template = Template((_template_dir / 'email.html').read_text(encoding='utf-8'))
+_default_template_dir = Path(__file__).parent / 'templates'
 
 
 class EmailSender:
@@ -46,11 +45,19 @@ class EmailSender:
         self.sender_email = sender_email
         self.sender_password = sender_password
         self.sender_name = sender_name
-        self.template_dir = template_dir or _template_dir
-    
+        self.template_dir = template_dir or _default_template_dir
+
+        # 初始化 Jinja2 环境
+        self.jinja_env = Environment(
+            loader=FileSystemLoader(str(self.template_dir)),
+            autoescape=select_autoescape(['html', 'xml'])
+        )
+
+        # 预加载 CSS
+        self.css = (self.template_dir / 'email.css').read_text(encoding='utf-8')
+
     def create_html_email(self, weather_data: Dict, processed_data: Dict, news_data: List[Dict] = None) -> str:
-        """
-        创建HTML邮件内容
+        """创建HTML邮件内容
 
         Args:
             weather_data: 天气数据
@@ -60,79 +67,21 @@ class EmailSender:
         Returns:
             HTML邮件内容
         """
-        beijing_weather = self._generate_city_weather(
-            '北京', weather_data.get('beijing', {}),
-            processed_data.get('weather_advice', {}).get('beijing', '')
-        )
-        jinan_weather = self._generate_city_weather(
-            '济南', weather_data.get('jinan', {}),
-            processed_data.get('weather_advice', {}).get('jinan', '')
-        )
-        news_section = self._generate_news_section(news_data) if news_data else ""
+        # 准备模板上下文
+        context = {
+            'css': self.css,
+            'character': processed_data.get('character', '神秘来客'),
+            'greeting': processed_data.get('greeting', '早安！'),
+            'beijing_weather': weather_data.get('beijing', {}),
+            'jinan_weather': weather_data.get('jinan', {}),
+            'beijing_advice': processed_data.get('weather_advice', {}).get('beijing', ''),
+            'jinan_advice': processed_data.get('weather_advice', {}).get('jinan', ''),
+            'categories': self._group_news_by_category(news_data) if news_data else []
+        }
 
-        return _html_template.substitute(
-            css=_css,
-            character=processed_data.get('character', '神秘来客'),
-            greeting=processed_data.get('greeting', '早安！'),
-            beijing_weather=beijing_weather,
-            jinan_weather=jinan_weather,
-            news_section=news_section,
-        )
-    
-    def _generate_city_weather(self, city_name: str, weather: Dict, advice: str) -> str:
-        """生成单个城市的天气HTML"""
-        alerts = weather.get('alerts', [])
-
-        # 构建基础信息
-        base_info = f'''
-        <div class="weather-card">
-            <div class="weather-city">{city_name}</div>
-            <table style="width:100%; border-collapse:collapse;">
-                <tr>
-                    <td style="text-align:center; padding:8px 0;">
-                        <span class="weather-condition">{weather.get("weather", "未知")}</span>
-                        <span class="weather-divider">|</span>
-                        <span class="weather-temp">{weather.get("temperature", "未知")}</span>
-                    </td>
-                </tr>
-            </table>
-            <div class="weather-detail">{weather.get("wind", "未知")}</div>
-            <div class="weather-detail">🌅 {weather.get("sunrise", "未知")} | 🌇 {weather.get("sunset", "未知")}</div>
-            '''
-
-        # 可选部分：天气预警
-        alert_html = ''
-        if alerts:
-            alert_items = ''.join(f'<div class="alert-item">⚠️ {alert}</div>' for alert in alerts)
-            alert_html = f'<div class="weather-alert">{alert_items}</div>'
-
-        # 可选部分：穿衣建议
-        advice_html = f'<div class="weather-advice">💡 {advice}</div>' if advice else ''
-
-        # 组装并关闭卡片
-        return base_info + alert_html + advice_html + '</div>'
-    
-    def _generate_news_section(self, news_list: List[Dict]) -> str:
-        """生成新闻部分的HTML（按领域分组）"""
-        if not news_list:
-            return ""
-
-        # 按领域分组
-        categories = self._group_news_by_category(news_list)
-
-        html = '<h2 class="section-title">科学新闻</h2>\n'
-
-        # 按 A、B、C 顺序输出
-        for cat_data in categories:
-            html += f'<div class="category-section">\n'
-            html += f'<div class="category-title">{cat_data["title"]} ({len(cat_data["items"])})</div>\n'
-
-            for news in cat_data['items']:
-                html += self._render_news_item(news)
-
-            html += '</div>\n'
-
-        return html
+        # 渲染模板
+        template = self.jinja_env.get_template('email.html')
+        return template.render(**context)
 
     def _group_news_by_category(self, news_list: List[Dict]) -> List[Dict]:
         """按领域分组新闻
@@ -144,51 +93,23 @@ class EmailSender:
             非空分类列表，按 A、B、C 顺序
         """
         categories = {
-            'A': {'title': '🔭 天体物理', 'items': []},
-            'B': {'title': '🧠 元认知与心理学', 'items': []},
-            'C': {'title': '📰 其他科学发现', 'items': []}
+            'A': {'title': '🔭 天体物理', 'news_items': []},
+            'B': {'title': '🧠 元认知与心理学', 'news_items': []},
+            'C': {'title': '📰 其他科学发现', 'news_items': []}
         }
 
         for news in news_list:
             category = news.get('category', 'C')
             if category not in categories:
                 category = 'C'
-            categories[category]['items'].append(news)
+
+            # 添加简化后的来源名称
+            news['source_short'] = self._simplify_source_name(news.get('source', ''))
+            categories[category]['news_items'].append(news)
 
         # 返回非空分类
-        return [cat for cat in categories.values() if cat['items']]
+        return [cat for cat in categories.values() if cat['news_items']]
 
-    def _render_news_item(self, news: Dict) -> str:
-        """渲染单条新闻的 HTML
-
-        Args:
-            news: 新闻数据
-
-        Returns:
-            HTML 字符串
-        """
-        title_cn = news.get('title_cn', news.get('title', '未知标题'))
-        title_en = news.get('title_en', news.get('title', ''))
-        url = news.get('url', '#')
-        summary = news.get('summary', '')
-        date = news.get('date', '')
-        source = news.get('source', '')
-
-        source_short = self._simplify_source_name(source)
-        source_suffix = f', {source_short}' if source_short else ''
-
-        return f'''
-            <div class="news-item">
-                <div class="news-title">
-                    {title_cn}
-                    <a href="{url}" class="news-link-btn" target="_blank">🔗</a>
-                    <span class="news-date">{date}</span>
-                </div>
-                <div class="news-title-en">{title_en}{source_suffix}</div>
-                <div class="news-summary">{summary}</div>
-            </div>
-            '''
-    
     def _simplify_source_name(self, source: str) -> str:
         """简化新闻来源名称"""
         source_map = {
@@ -212,7 +133,6 @@ class EmailSender:
         }
         return source_map.get(source, source)
 
-    
     def send_email(self, receiver_emails: List[str], subject: str, html_content: str, max_retries: int = 3) -> bool:
         """
         发送HTML邮件（带重试机制）
@@ -233,19 +153,19 @@ class EmailSender:
                 msg['From'] = formataddr((self.sender_name, self.sender_email))
                 msg['To'] = ', '.join(receiver_emails)
                 msg['Subject'] = subject
-                
+
                 # 添加HTML内容
                 html_part = MIMEText(html_content, 'html', 'utf-8')
                 msg.attach(html_part)
-                
+
                 # 连接SMTP服务器并发送
                 if attempt > 0:
                     wait_time = [5, 15, 30][attempt - 1]
                     logger.info(f"重试第 {attempt} 次，等待 {wait_time} 秒...")
                     time.sleep(wait_time)
-                
+
                 logger.info(f"正在连接SMTP服务器: {self.smtp_server}:{self.smtp_port}")
-                
+
                 if self.smtp_port == 465:
                     # 使用SSL连接 (Port 465)
                     server = smtplib.SMTP_SSL(self.smtp_server, self.smtp_port, timeout=30)
@@ -253,18 +173,18 @@ class EmailSender:
                     # 使用STARTTLS连接 (Port 587等)
                     server = smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=30)
                     server.starttls()
-                
+
                 server.login(self.sender_email, self.sender_password)
                 server.send_message(msg)
                 server.quit()
-                
+
                 logger.info(f"邮件发送成功，接收者: {', '.join(receiver_emails)}")
                 return True
-                
+
             except smtplib.SMTPException as e:
                 error_msg = str(e)
                 logger.error(f"SMTP错误 (尝试 {attempt + 1}/{max_retries}): {error_msg}")
-                
+
                 # 450错误通常是临时性的，可以重试
                 if '450' in error_msg and attempt < max_retries - 1:
                     logger.info(f"检测到临时错误(450)，将重试...")
@@ -276,12 +196,12 @@ class EmailSender:
                     logger.error("  2. 检查邮箱设置是否允许发送")
                     logger.error("  3. 确认SMTP密码正确")
                     return False
-                    
+
             except Exception as e:
                 logger.error(f"邮件发送失败 (尝试 {attempt + 1}/{max_retries}): {e}")
                 if attempt == max_retries - 1:
                     return False
-        
+
         return False
 
 
@@ -289,13 +209,13 @@ if __name__ == '__main__':
     # 测试代码
     from config import config
     from weather_parser import parse_weather_files
-    
+
     # 获取天气数据
     weather_data = parse_weather_files(
         config.BEIJING_WEATHER_URL,
         config.JINAN_WEATHER_URL
     )
-    
+
     # 使用模拟数据测试邮件生成（不消耗 API token）
     processed_data = {
         'greeting': '早安！今天天气不错哦～',
@@ -316,7 +236,7 @@ if __name__ == '__main__':
             'category': 'A'
         }
     ]
-    
+
     # 创建邮件
     sender = EmailSender(
         config.SMTP_SERVER,
@@ -324,9 +244,9 @@ if __name__ == '__main__':
         config.SENDER_EMAIL,
         config.SENDER_PASSWORD
     )
-    
+
     html = sender.create_html_email(weather_data, processed_data, mock_news)
-    
+
     # 保存HTML用于预览
     with open('/tmp/email_preview.html', 'w', encoding='utf-8') as f:
         f.write(html)

@@ -1,0 +1,26 @@
+<div class="weather-card">
+    <div class="weather-city">{{ city_name }}</div>
+    <table style="width:100%; border-collapse:collapse;">
+        <tr>
+            <td style="text-align:center; padding:8px 0;">
+                <span class="weather-condition">{{ weather.weather | default('未知') }}</span>
+                <span class="weather-divider">|</span>
+                <span class="weather-temp">{{ weather.temperature | default('未知') }}</span>
+            </td>
+        </tr>
+    </table>
+    <div class="weather-detail">{{ weather.wind | default('未知') }}</div>
+    <div class="weather-detail">🌅 {{ weather.sunrise | default('未知') }} | 🌇 {{ weather.sunset | default('未知') }}</div>
+
+    {%- if weather.alerts %}
+    <div class="weather-alert">
+        {%- for alert in weather.alerts %}
+        <div class="alert-item">⚠️ {{ alert }}</div>
+        {%- endfor %}
+    </div>
+    {%- endif %}
+
+    {%- if advice %}
+    <div class="weather-advice">💡 {{ advice }}</div>
+    {%- endif %}
+</div>

@@ -1,0 +1,17 @@
+<h2 class="section-title">科学新闻</h2>
+{%- for category in categories %}
+<div class="category-section">
+    <div class="category-title">{{ category.title }} ({{ category.news_items | length }})</div>
+    {%- for news in category.news_items %}
+    <div class="news-item">
+        <div class="news-title">
+            {{ news.title_cn | default(news.title) | default('未知标题') }}
+            <a href="{{ news.url | default('#') }}" class="news-link-btn" target="_blank">🔗</a>
+            <span class="news-date">{{ news.date | default('') }}</span>
+        </div>
+        <div class="news-title-en">{{ news.title_en | default(news.title) | default('') }}{% if news.source_short %}, {{ news.source_short }}{% endif %}</div>
+        <div class="news-summary">{{ news.summary | default('') }}</div>
+    </div>
+    {%- endfor %}
+</div>
+{%- endfor %}
