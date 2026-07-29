@@ -50,8 +50,10 @@ daily_magic_bot/
 ├── config.py              # 配置管理（环境变量 + 校验）
 ├── weather_parser.py      # 天气数据解析（容错 + 默认值）
 ├── news_fetcher.py        # 新闻获取（13源并行抓取 + Session连接池）
+├── async_news_fetcher.py  # 异步文章详情抓取（aiohttp 并发）
 ├── gemini_processor.py    # Gemini AI处理（指数退避重试 + 校验）
-├── email_sender.py        # 邮件发送（指数退避重试 + SSL/TLS）
+├── email_sender.py        # 邮件发送（Jinja2模板 + 指数退避重试）
+├── logging_config.py      # 日志配置模块
 ├── main.py                # 主程序（计时 + 多模式）
 ├── requirements.txt       # Python依赖（版本范围锁定）
 ├── pyproject.toml         # 项目元数据（Python >= 3.10）
@@ -59,8 +61,11 @@ daily_magic_bot/
 ├── .github/workflows/     # GitHub Actions 自动化
 │   └── daily_report.yml   # 每日定时任务（北京时间 7:32）
 ├── .gitignore             # Git忽略文件
-├── templates/             # 邮件模板
-│   ├── email.html         # HTML 邮件模板
+├── templates/             # 邮件模板（Jinja2）
+│   ├── email_base.html    # 基础模板（HTML骨架）
+│   ├── email.html         # 主邮件模板
+│   ├── weather_card.html  # 天气卡片组件
+│   ├── news_section.html  # 新闻列表组件
 │   └── email.css          # 响应式 CSS 样式
 └── README.md              # 本文件
 ```
@@ -233,6 +238,30 @@ jobs:
 - 查看日志确认具体错误
 
 ## 更新日志
+
+### v2.5 (2026-07-29)
+- 🔧 **代码质量深度重构**：
+  - **常量提取**：所有魔法数字提取为模块级常量（超时/重试/限制值等）
+  - **Bug 修复**：
+    - 修复 weather_parser 天气预警判断逻辑（支持 display:inline-block 等变体）
+    - 修复 gemini_processor 异常检测（优先结构化 code/status 属性，字符串匹配兜底）
+  - **代码去重**：weather_parser 添加辅助方法，email_sender 简化重复拼接
+- 🏗️ **架构优化**：
+  - **配置实例化**：config.py 从类属性改为实例属性，支持依赖注入
+  - **依赖注入**：GeminiProcessor/EmailSender/MultiSourceNewsFetcher 支持测试时注入 mock
+  - **日志模块化**：新增 logging_config.py 统一日志配置
+- 🎨 **模板引擎迁移**：
+  - **Jinja2**：替代 string.Template，支持模板继承/组件化/自动 HTML 转义
+  - **组件化模板**：email_base.html（骨架）+ weather_card.html（天气卡片）+ news_section.html（新闻列表）
+  - **自动转义**：防止 XSS 注入，所有用户输入自动转义
+- ⚡ **异步化文章抓取**：
+  - **aiohttp 并发**：15-20 篇文章并发抓取，semaphore 限制最大并发数（10）
+  - **性能提升**：文章抓取从串行 ~10s 降至并发 ~2s（理论 5x 提升）
+  - **智能跳过**：ScienceDaily/Science 来源直接使用 RSS 摘要，无需抓取
+- 📦 **依赖更新**：
+  - 新增 jinja2>=3.1.0,<4.0.0
+  - 新增 aiohttp>=3.9.0,<4.0.0
+  - pyproject.toml 版本 2.2.0 → 2.5.0
 
 ### v2.4 (2026-05-27)
 - 🎯 **筛选精简**：新闻数量上限从 30 条收紧至 20 条，强化质量控制
