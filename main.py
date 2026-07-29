@@ -4,10 +4,13 @@
 """
 import argparse
 import logging
+import requests
+import smtplib
 import time
 from datetime import datetime
 from config import config
 from weather_parser import parse_weather_files
+from news_fetcher import fetch_all_news
 from gemini_processor import process_daily_report
 from email_sender import EmailSender
 
@@ -50,7 +53,6 @@ def generate_daily_report():
         
         # 2. 获取科学新闻（多源）
         logger.info("\n[2/4] 获取科学新闻...")
-        from news_fetcher import fetch_all_news
         news_list = fetch_all_news()
         logger.info(f"  - 获取到 {len(news_list)} 条新闻")
         
@@ -94,8 +96,6 @@ def generate_daily_report():
 
 def create_test_email() -> str:
     """创建简单的测试邮件（不消耗API token）"""
-    from datetime import datetime
-
     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     html = f"""
@@ -151,9 +151,6 @@ def create_test_email() -> str:
 
 def run_checks():
     """预检模式：逐项检查所有依赖是否正常"""
-    import requests
-    import smtplib
-
     results = []
 
     def check(name):

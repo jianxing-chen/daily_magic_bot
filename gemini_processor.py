@@ -3,6 +3,7 @@ Gemini AI处理模块
 使用Gemini API进行内容处理和生成
 """
 from google import genai
+from google.genai import errors as genai_errors
 from typing import List, Dict
 import random
 import logging
@@ -13,6 +14,13 @@ from config import config
 from news_fetcher import MultiSourceNewsFetcher
 
 logger = logging.getLogger(__name__)
+
+# --- 处理配置常量 ---
+MAX_CONTENT_LENGTH = 5000      # 单篇文章最大内容长度（字符）
+MAX_CONTENT_PREVIEW = 3000     # 发送给 AI 的内容预览长度（字符）
+ARTICLE_FETCH_DELAY = 0.5      # Nature 文章抓取间隔（秒）
+RETRYABLE_STATUS_CODES = {503, 429}  # 可重试的 HTTP 状态码
+RETRYABLE_STATUS_NAMES = {'UNAVAILABLE', 'RESOURCE_EXHAUSTED'}  # 可重试的 gRPC 状态名
 
 
 class GeminiProcessor:
@@ -31,6 +39,29 @@ class GeminiProcessor:
         self.max_retries = 2
         logger.info("Gemini处理器初始化成功")
     
+    def _is_retryable_error(self, error: Exception) -> bool:
+        """判断是否为可重试的临时错误
+
+        优先使用结构化的异常属性（code/status），字符串匹配作为兜底。
+
+        Args:
+            error: 捕获的异常
+
+        Returns:
+            True 表示临时错误（可重试/回退），False 表示永久错误（应立即抛出）
+        """
+        # 结构化判断：SDK 的 APIError 携带 code（HTTP 状态码）和 status（gRPC 状态名）
+        if isinstance(error, genai_errors.APIError):
+            if error.code in RETRYABLE_STATUS_CODES:
+                return True
+            if error.status and error.status in RETRYABLE_STATUS_NAMES:
+                return True
+            return False
+
+        # 兜底：非 APIError 时退回字符串匹配（网络错误、SDK 内部错误等）
+        error_str = str(error)
+        return any(code in error_str for code in ['503', '429', 'UNAVAILABLE', 'RESOURCE_EXHAUSTED'])
+
     def _call_with_retry(self, prompt: str, use_json: bool = True) -> str:
         """
         带指数退避重试 + 多模型回退的 Gemini API 调用
@@ -62,10 +93,9 @@ class GeminiProcessor:
                 except Exception as e:
                     error_str = str(e)
                     last_error = e
-                    is_retryable = any(code in error_str for code in ['503', '429', 'UNAVAILABLE', 'RESOURCE_EXHAUSTED'])
 
                     # 非临时错误（400/认证失败/模型不存在等）不回退，直接抛出
-                    if not is_retryable:
+                    if not self._is_retryable_error(e):
                         raise
 
                     # 临时错误：还有重试次数 → 退避后重试当前模型
@@ -218,7 +248,7 @@ class GeminiProcessor:
             articles_text = ""
             for i, art in enumerate(articles, 1):
                 content = art['content'] or ''
-                content_preview = content[:3000]
+                content_preview = content[:MAX_CONTENT_PREVIEW]
                 content_len = len(content)
                 articles_text += f"""
 文章 {i}:
@@ -358,7 +388,7 @@ def process_daily_report(weather_data: Dict, news_list: List[Dict]) -> Dict:
                     
                     # 仅在抓取网页时暂停，避免爬虫请求过快
                     if not (source == 'Science' or source.startswith('ScienceDaily')):
-                        time.sleep(0.5)
+                        time.sleep(ARTICLE_FETCH_DELAY)
                     
                 except Exception as e:
                     logger.error(f"获取文章内容失败 {news['title']}: {e}")

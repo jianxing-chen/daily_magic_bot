@@ -10,6 +10,9 @@ import re
 
 logger = logging.getLogger(__name__)
 
+# --- 抓取配置常量 ---
+REQUEST_TIMEOUT = 10          # HTTP 请求超时（秒）
+
 _session = requests.Session()
 _session.headers.update({
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
@@ -38,7 +41,7 @@ class WeatherParser:
         """从URL加载HTML数据"""
         try:
             logger.info(f"正在获取天气数据: {self.url}")
-            response = _session.get(self.url, timeout=10)
+            response = _session.get(self.url, timeout=REQUEST_TIMEOUT)
             response.encoding = 'utf-8'
             self.soup = BeautifulSoup(response.text, 'lxml')
             logger.info("成功获取并解析HTML数据")
@@ -131,10 +134,13 @@ class WeatherParser:
                 result['sunset'] = '未知'
             
             # 获取天气预警
+            # weather.com.cn 通过 inline style 的 display 控制预警显示/隐藏
             alerts = []
             alert_elems = self.soup.select('div.sk_alarm a')
             for alert in alert_elems:
-                if alert.get('style') and 'display: block' in alert.get('style', ''):
+                style = alert.get('style', '')
+                # 显示预警的条件：有 style 且 display 不是 none
+                if style and 'display' in style and 'none' not in style.lower():
                     alert_text = alert.get('title', alert.text.strip())
                     alerts.append(alert_text)
             

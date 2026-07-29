@@ -14,6 +14,16 @@ import re
 
 logger = logging.getLogger(__name__)
 
+# --- 抓取配置常量 ---
+MAX_WORKERS = 8               # 并行抓取线程数
+MAX_NATURE_ARTICLES = 50      # Nature 网页抓取最大条数
+MAX_RSS_ITEMS = 60            # Nature/Science RSS 最大条数
+MAX_SCIENCEDAILY_ITEMS = 40   # ScienceDaily/心理学源最大条数
+MAX_CONTENT_LENGTH = 5000     # 单篇文章全文最大长度（字符）
+REQUEST_TIMEOUT = 15          # HTTP 请求超时（秒）
+FETCH_TIMEOUT = 20            # 单源并行任务超时（秒）
+NATURE_FETCH_DELAY = 0.5      # Nature 文章抓取间隔（秒）
+
 
 class MultiSourceNewsFetcher:
     """多源科学新闻获取器"""
@@ -75,16 +85,16 @@ class MultiSourceNewsFetcher:
         tasks.append(('nature_web', None, None, None))
         # RSS 源
         for key, (url, source_name) in self.nature_rss.items():
-            tasks.append(('rss', url, source_name, 60))
+            tasks.append(('rss', url, source_name, MAX_RSS_ITEMS))
         for key, (url, source_name) in self.science_rss.items():
-            tasks.append(('rss', url, source_name, 60))
+            tasks.append(('rss', url, source_name, MAX_RSS_ITEMS))
         for key, (url, source_name) in self.sciencedaily_rss.items():
-            tasks.append(('rss', url, source_name, 40))
+            tasks.append(('rss', url, source_name, MAX_SCIENCEDAILY_ITEMS))
         for key, (url, source_name) in self.psychology_rss.items():
-            tasks.append(('rss', url, source_name, 40))
+            tasks.append(('rss', url, source_name, MAX_SCIENCEDAILY_ITEMS))
         
-        # 并行抓取（最多 8 个线程）
-        with ThreadPoolExecutor(max_workers=8) as executor:
+        # 并行抓取（最多 MAX_WORKERS 个线程）
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             futures = {}
             for task in tasks:
                 if task[0] == 'nature_web':
@@ -96,7 +106,7 @@ class MultiSourceNewsFetcher:
             
             for future in as_completed(futures):
                 try:
-                    result = future.result(timeout=20)
+                    result = future.result(timeout=FETCH_TIMEOUT)
                     all_news.extend(result)
                 except Exception as e:
                     task_info = futures[future]
@@ -124,14 +134,14 @@ class MultiSourceNewsFetcher:
         """获取 Nature 最新新闻（网页抓取）"""
         try:
             logger.info("正在获取 Nature 最新新闻...")
-            response = self.session.get(self.nature_web['nature_news'], timeout=15)
+            response = self.session.get(self.nature_web['nature_news'], timeout=REQUEST_TIMEOUT)
             soup = BeautifulSoup(response.text, 'html.parser')
             
             news_list = []
             # Nature 使用 c-article-item 结构
             articles = soup.select('div.c-article-item__content')
             
-            for article in articles[:50]:  # 增加获取数量
+            for article in articles[:MAX_NATURE_ARTICLES]:  # 限制获取数量
                 title_elem = article.select_one('h3.c-article-item__title')
                 if not title_elem:
                     continue
@@ -182,7 +192,7 @@ class MultiSourceNewsFetcher:
         try:
             logger.info(f"正在获取 {source_name} RSS...")
             # 先用 requests 带超时获取，再交给 feedparser 解析
-            rss_response = self.session.get(rss_url, timeout=15)
+            rss_response = self.session.get(rss_url, timeout=REQUEST_TIMEOUT)
             feed = feedparser.parse(rss_response.content)
             
             news_list = []
@@ -301,7 +311,7 @@ class MultiSourceNewsFetcher:
         """
         try:
             logger.info(f"正在获取文章详情: {url}")
-            response = self.session.get(url, timeout=15)
+            response = self.session.get(url, timeout=REQUEST_TIMEOUT)
             response.encoding = 'utf-8'
             soup = BeautifulSoup(response.text, 'html.parser')
             
@@ -339,7 +349,7 @@ class MultiSourceNewsFetcher:
         return {
             'title': title,
             'abstract': abstract,
-            'full_text': full_text[:5000],  # 限制长度
+            'full_text': full_text[:MAX_CONTENT_LENGTH],  # 限制长度
             'url': url
         }
     
@@ -362,7 +372,7 @@ class MultiSourceNewsFetcher:
         return {
             'title': title,
             'abstract': abstract,
-            'full_text': full_text[:5000],
+            'full_text': full_text[:MAX_CONTENT_LENGTH],
             'url': url
         }
     
@@ -385,7 +395,7 @@ class MultiSourceNewsFetcher:
         return {
             'title': title,
             'abstract': abstract,
-            'full_text': full_text[:5000],
+            'full_text': full_text[:MAX_CONTENT_LENGTH],
             'url': url
         }
 
