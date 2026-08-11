@@ -30,7 +30,8 @@
   - **极速架构**：采用 Unified Request 模式，每次运行仅需 **2 次** AI 调用
   - **智能融合**：哈利波特角色开场白智能融合当日天气与科学大新闻
   - **批量处理**：一次性完成多条新闻的翻译与总结，摘要长度根据输入内容自适应（100-400 字）
-  - **指数退避重试**：自动处理 503/429 等临时错误（15s → 30s → 60s）
+  - **指数退避重试**：自动处理 503/429 等临时错误（Gemini 链 30s → 60s）
+  - **多模型回退 + 跨厂商兜底**：gemini-3.5-flash → 3-flash-preview → 2.5-pro → DeepSeek V4 Flash（需配置 DEEPSEEK_API_KEY）
   - **返回值校验**：AI 输出 schema 校验 + 降级兜底，确保邮件始终可发送
   - 筛选结果：15-20 条精选新闻（A/B/C 三领域，C 领域严格把关宁缺毋滥）
 
@@ -105,6 +106,9 @@ cp .env.template .env
 # Gemini API配置
 GEMINI_API_KEY=your_actual_api_key_here
 
+# DeepSeek API配置（可选，Gemini 全部失效时的兜底模型）
+DEEPSEEK_API_KEY=your_deepseek_key_here
+
 # 邮箱配置（以Gmail为例）
 SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
@@ -120,6 +124,7 @@ RECEIVER_EMAILS=email1@example.com,email2@example.com
 
 **重要提示**：
 - **Gemini API密钥**：从[Google AI Studio](https://aistudio.google.com/)获取
+- **DeepSeek API密钥**（可选兜底）：从[DeepSeek 开放平台](https://platform.deepseek.com/)获取
 - **Gmail应用密码**：需要在Google账户中生成[应用专用密码](https://myaccount.google.com/apppasswords)
 
 ## 使用方法
@@ -184,6 +189,7 @@ jobs:
       - name: Run daily report
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
@@ -202,6 +208,7 @@ jobs:
 | Name (变量名) | Secret (值/占位符) |
 | :--- | :--- |
 | `GEMINI_API_KEY` | `your_api_key_here` |
+| `DEEPSEEK_API_KEY` | `your_deepseek_key_here`（可选兜底） |
 | `SMTP_SERVER` | `smtp.gmail.com` |
 | `SMTP_PORT` | `587` |
 | `SENDER_EMAIL` | `your_email@gmail.com` |
@@ -229,8 +236,9 @@ jobs:
 - 确认 API 密钥正确
 - 检查 API 配额是否用尽
 - 确认网络能访问 Google 服务
-- **503/429 错误**：程序会自动重试（15s → 30s → 60s），通常为 Gemini 高峰期临时过载
-- 若重试仍失败，会使用降级内容（默认问候语 + 前 15 条新闻），确保邮件可发送
+- **503/429 错误**：程序会自动重试（Gemini 链 30s → 60s，逐模型回退），通常为 Gemini 高峰期临时过载
+- Gemini 三个模型全部失效时，若配置了 `DEEPSEEK_API_KEY` 会自动兜底切换到 DeepSeek V4 Flash
+- 若所有模型均失败，会使用降级内容（默认问候语 + 前 15 条新闻），确保邮件可发送
 
 ### 3. 天气数据解析失败
 - 确认网络可访问 weather.com.cn

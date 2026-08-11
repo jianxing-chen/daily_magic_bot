@@ -15,6 +15,9 @@ load_dotenv(dotenv_path=env_path)
 # 邮箱格式正则（RFC 5322 简化版）
 EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 
+# DeepSeek API key 占位符（未配置时不启用兜底）
+DEEPSEEK_KEY_PLACEHOLDER = 'your_deepseek_key_here'
+
 
 class Config:
     """应用配置类"""
@@ -23,6 +26,11 @@ class Config:
         """从环境变量加载配置"""
         # Gemini API配置
         self.GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', 'your_api_key_here')
+
+        # DeepSeek API配置（Gemini 全部失效时的兜底模型，可选）
+        self.DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', DEEPSEEK_KEY_PLACEHOLDER)
+        self.DEEPSEEK_BASE_URL = os.getenv('DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
+        self.DEEPSEEK_MODEL = os.getenv('DEEPSEEK_MODEL', 'deepseek-v4-flash')
 
         # 邮箱配置
         self.SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
@@ -75,6 +83,11 @@ class Config:
                 errors.append(f'RECEIVER_EMAILS 包含无效邮箱: {", ".join(invalid)}')
 
         return errors
+
+    @property
+    def deepseek_enabled(self) -> bool:
+        """DeepSeek 兜底是否已配置（API key 非占位符）"""
+        return bool(self.DEEPSEEK_API_KEY) and self.DEEPSEEK_API_KEY != DEEPSEEK_KEY_PLACEHOLDER
 
 
 # 导出配置单例

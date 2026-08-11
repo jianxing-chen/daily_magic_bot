@@ -13,6 +13,22 @@ import re
 
 logger = logging.getLogger(__name__)
 
+
+def clean_text(text: str) -> str:
+    """清洗文本：合并换行/连续空白为单个空格
+
+    RSS/网页标题可能携带换行、多余空白或 HTML 残留，
+    在源头统一清洗，避免下游 prompt 编号行被破坏。
+
+    Args:
+        text: 原始文本
+
+    Returns:
+        清洗后的单行文本
+    """
+    return re.sub(r'\s+', ' ', text or '').strip()
+
+
 # --- 抓取配置常量 ---
 MAX_WORKERS = 8               # 并行抓取线程数
 MAX_NATURE_ARTICLES = 50      # Nature 网页抓取最大条数
@@ -161,11 +177,11 @@ class MultiSourceNewsFetcher:
                 summary = summary_elem.get_text(strip=True) if summary_elem else ''
 
                 news_list.append({
-                    'title': title,
+                    'title': clean_text(title),
                     'url': url,
                     'source': 'Nature News',
                     'date': self._parse_date(date_str),
-                    'description': summary
+                    'description': clean_text(summary)
                 })
             
             logger.info(f"  - Nature News: {len(news_list)} 条")
@@ -209,14 +225,14 @@ class MultiSourceNewsFetcher:
                 summary = entry.get('summary', '') or entry.get('description', '')
                 # 清理HTML标签（简单清理）
                 if summary:
-                    summary = re.sub(r'<[^>]+>', '', summary).strip()
+                    summary = re.sub(r'<[^>]+>', '', summary)
                 
                 news_list.append({
-                    'title': title,
+                    'title': clean_text(title),
                     'url': url,
                     'source': source_name,
                     'date': date_str,
-                    'description': summary
+                    'description': clean_text(summary)
                 })
             
             logger.info(f"  - {source_name}: {len(news_list)} 条")
