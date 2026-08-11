@@ -56,18 +56,24 @@ daily_magic_bot/
 ├── email_sender.py        # 邮件发送（Jinja2模板 + 指数退避重试）
 ├── logging_config.py      # 日志配置模块
 ├── main.py                # 主程序（计时 + 多模式）
-├── requirements.txt       # Python依赖（版本范围锁定）
-├── pyproject.toml         # 项目元数据（Python >= 3.10）
+├── requirements.txt       # Python运行依赖（唯一事实源，版本范围锁定）
+├── requirements-dev.txt   # 开发/测试依赖（含 pytest）
+├── pyproject.toml         # 项目元数据（Python >= 3.10，依赖动态读取 requirements.txt）
 ├── .env.template          # 环境变量模板
 ├── .github/workflows/     # GitHub Actions 自动化
 │   └── daily_report.yml   # 每日定时任务（北京时间 7:32）
-├── .gitignore             # Git忽略文件
-├── templates/             # 邮件模板（Jinja2）
+├── .gitignore               # Git忽略文件
+├── templates/               # 邮件模板（Jinja2）
 │   ├── email_base.html    # 基础模板（HTML骨架）
 │   ├── email.html         # 主邮件模板
 │   ├── weather_card.html  # 天气卡片组件
 │   ├── news_section.html  # 新闻列表组件
 │   └── email.css          # 响应式 CSS 样式
+├── tests/                   # pytest 离线单元测试（无网络/零 token）
+│   ├── test_json_parser.py    # AI 返回健壮解析（9 种畸形形态回归）
+│   ├── test_weather_parser.py # 时段对齐/温度归一/实况温度
+│   ├── test_news_fetcher.py   # 文本清洗/日期解析/时效过滤
+│   └── test_email_rendering.py# 邮件渲染端到端（mock 数据）
 └── README.md              # 本文件
 ```
 
@@ -89,7 +95,11 @@ conda activate daily_report
 ### 3. 安装依赖
 
 ```bash
+# 运行依赖
 pip install -r requirements.txt
+
+# 开发/测试依赖（含 pytest，开发者使用）
+pip install -r requirements-dev.txt
 ```
 
 ### 4. 配置环境变量
@@ -143,6 +153,9 @@ RECEIVER_EMAILS=email1@example.com,email2@example.com
 # 首次配置后：预检环境
 python main.py --check
 
+# 运行离线单元测试（无网络/零 token）
+pytest
+
 # 验证邮件能收到
 python main.py --email-test
 
@@ -184,7 +197,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
       
       - name: Run daily report
         env:
@@ -246,6 +259,22 @@ jobs:
 - 查看日志确认具体错误
 
 ## 更新日志
+
+### v2.6 (2026-08-11)
+- 🛡️ **AI 健壮性修复**：
+  - 新增健壮 JSON 解析器 `parse_ai_json`：容错 Markdown 代码块围栏、`//` 注释、尾逗号、前后缀废话，解析失败时打印原始返回文本便于定位
+  - 删除 prompt 示例中的非法 `//` 注释（曾诱导模型回显导致解析失败），筛选条数统一为 15-20 条
+  - 修复“开头问候与天气建议频繁降级为兜底文案”的主因
+- 🔀 **跨厂商兜底**：Gemini 三模型（3.5-flash → 3-flash-preview → 2.5-pro）全部失效时，自动切换 DeepSeek V4 Flash（OpenAI 兼容格式，需配置 `DEEPSEEK_API_KEY`，不配置不影响正常运行）
+- 🌤️ **天气解析修复**：
+  - 按 h1 时段标签识别白天/夜间区块并对齐今天日期，修复傍晚后页面布局切换导致的温度范围颠倒（如 28~23°C）与跨天串数据问题，温度输出强制 min~max 归一
+  - 实况温度恢复提取（改从页面内嵌 observe24h_data 获取，原 CSS 选择器已失效）
+  - 修复济南城市名被解析为“山东”的面包屑层级问题
+- 📝 **Prompt 增强**：
+  - 天气输入从 3 字段扩展为全量（新增实况温度、日出日落，有预警时追加预警行）
+  - 新闻列表附加截断摘要（100 字符），解决筛选规则提到摘要却未传入的问题
+  - 新闻标题/摘要在抓取源头统一清洗（合并换行/多余空白），防御异常字符破坏 prompt 编号行
+- 📄 **文档同步**：CLAUDE.md 修正 4 处过时描述（模板引擎/重试链/文章抓取/环境变量）
 
 ### v2.5 (2026-07-29)
 - 🔧 **代码质量深度重构**：

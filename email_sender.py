@@ -3,7 +3,7 @@
 生成HTML邮件并通过SMTP发送
 """
 import smtplib
-import time
+from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
@@ -13,9 +13,13 @@ import logging
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from retry import retry_with_backoff
+
 logger = logging.getLogger(__name__)
 
 _default_template_dir = Path(__file__).parent / 'templates'
+
+SMTP_RETRY_WAITS = [5, 15, 30]       # SMTP 重试退避等待（秒）
 
 
 class EmailSender:
@@ -83,6 +87,17 @@ class EmailSender:
         template = self.jinja_env.get_template('email.html')
         return template.render(**context)
 
+    def create_test_email(self) -> str:
+        """创建简单的测试邮件（不消耗API token）
+
+        Returns:
+            测试邮件 HTML 内容
+        """
+        template = self.jinja_env.get_template('test_email.html')
+        return template.render(
+            current_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        )
+
     def _group_news_by_category(self, news_list: List[Dict]) -> List[Dict]:
         """按领域分组新闻
 
@@ -133,76 +148,81 @@ class EmailSender:
         }
         return source_map.get(source, source)
 
+    def _connect_smtp(self, timeout: int = 30):
+        """连接并登录 SMTP 服务器（465 SSL / 其余 STARTTLS）
+
+        Args:
+            timeout: 连接超时（秒）
+
+        Returns:
+            已登录的 SMTP 服务器对象
+        """
+        if self.smtp_port == 465:
+            server = smtplib.SMTP_SSL(self.smtp_server, self.smtp_port, timeout=timeout)
+        else:
+            server = smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=timeout)
+            server.starttls()
+        server.login(self.sender_email, self.sender_password)
+        return server
+
+    def test_connection(self, timeout: int = 15) -> None:
+        """测试 SMTP 连接与登录（供预检模式使用）
+
+        Args:
+            timeout: 连接超时（秒）
+
+        Raises:
+            smtplib.SMTPException / OSError: 连接或登录失败
+        """
+        server = self._connect_smtp(timeout=timeout)
+        server.quit()
+
     def send_email(self, receiver_emails: List[str], subject: str, html_content: str, max_retries: int = 3) -> bool:
         """
-        发送HTML邮件（带重试机制）
+        发送HTML邮件（带指数退避重试机制）
 
         Args:
             receiver_emails: 接收者邮箱列表
             subject: 邮件主题
             html_content: HTML邮件内容
-            max_retries: 最大重试次数
+            max_retries: 最大尝试次数
 
         Returns:
             成功返回True，失败返回False
         """
-        for attempt in range(max_retries):
+        # 构建邮件（重试间不变，只需构建一次）
+        msg = MIMEMultipart('alternative')
+        msg['From'] = formataddr((self.sender_name, self.sender_email))
+        msg['To'] = ', '.join(receiver_emails)
+        msg['Subject'] = subject
+        msg.attach(MIMEText(html_content, 'html', 'utf-8'))
+
+        def attempt():
+            logger.info(f"正在连接SMTP服务器: {self.smtp_server}:{self.smtp_port}")
+            server = self._connect_smtp(timeout=30)
             try:
-                # 创建邮件
-                msg = MIMEMultipart('alternative')
-                msg['From'] = formataddr((self.sender_name, self.sender_email))
-                msg['To'] = ', '.join(receiver_emails)
-                msg['Subject'] = subject
-
-                # 添加HTML内容
-                html_part = MIMEText(html_content, 'html', 'utf-8')
-                msg.attach(html_part)
-
-                # 连接SMTP服务器并发送
-                if attempt > 0:
-                    wait_time = [5, 15, 30][attempt - 1]
-                    logger.info(f"重试第 {attempt} 次，等待 {wait_time} 秒...")
-                    time.sleep(wait_time)
-
-                logger.info(f"正在连接SMTP服务器: {self.smtp_server}:{self.smtp_port}")
-
-                if self.smtp_port == 465:
-                    # 使用SSL连接 (Port 465)
-                    server = smtplib.SMTP_SSL(self.smtp_server, self.smtp_port, timeout=30)
-                else:
-                    # 使用STARTTLS连接 (Port 587等)
-                    server = smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=30)
-                    server.starttls()
-
-                server.login(self.sender_email, self.sender_password)
                 server.send_message(msg)
+            finally:
                 server.quit()
 
-                logger.info(f"邮件发送成功，接收者: {', '.join(receiver_emails)}")
-                return True
+        try:
+            retry_with_backoff(
+                attempt,
+                waits=SMTP_RETRY_WAITS[:max(0, max_retries - 1)],
+                label='SMTP',
+                # SMTP 失败原因多样（网络/限流/临时拒绝），保持原有语义：一律退避重试
+                retryable=lambda e: True
+            )
+            logger.info(f"邮件发送成功，接收者: {', '.join(receiver_emails)}")
+            return True
 
-            except smtplib.SMTPException as e:
-                error_msg = str(e)
-                logger.error(f"SMTP错误 (尝试 {attempt + 1}/{max_retries}): {error_msg}")
-
-                # 450错误通常是临时性的，可以重试
-                if '450' in error_msg and attempt < max_retries - 1:
-                    logger.info(f"检测到临时错误(450)，将重试...")
-                    continue
-                elif attempt == max_retries - 1:
-                    logger.error(f"邮件发送失败: {e}")
-                    logger.error("建议：")
-                    logger.error("  1. 稍后再试（可能是发送频率限制）")
-                    logger.error("  2. 检查邮箱设置是否允许发送")
-                    logger.error("  3. 确认SMTP密码正确")
-                    return False
-
-            except Exception as e:
-                logger.error(f"邮件发送失败 (尝试 {attempt + 1}/{max_retries}): {e}")
-                if attempt == max_retries - 1:
-                    return False
-
-        return False
+        except Exception as e:
+            logger.error(f"邮件发送失败: {e}")
+            logger.error("建议：")
+            logger.error("  1. 稍后再试（可能是发送频率限制）")
+            logger.error("  2. 检查邮箱设置是否允许发送")
+            logger.error("  3. 确认SMTP密码正确")
+            return False
 
 
 if __name__ == '__main__':

@@ -1,0 +1,6 @@
+# 开发/测试依赖（含全部运行依赖）
+# 安装: pip install -r requirements-dev.txt
+# 说明: requirements.txt 是运行依赖的唯一事实源，
+#       pyproject.toml 的 dependencies 动态读取该文件，请勿在此重复声明运行依赖
+-r requirements.txt
+pytest>=8.0.0,<9.0.0

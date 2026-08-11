@@ -3,8 +3,10 @@ __pycache__/
 *.pyc
 *.log
 venv/
+.venv/
 .DS_Store
 .pytest_cache/
+.claude/
 *.egg-info/
 dist/
 build/

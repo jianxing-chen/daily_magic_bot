@@ -4,13 +4,12 @@
 """
 import argparse
 import logging
-import requests
-import smtplib
 import time
+import requests
 from datetime import datetime
 from config import config
 from weather_parser import parse_weather_files
-from news_fetcher import fetch_all_news
+from news_fetcher import fetch_all_news, NATURE_RSS_URL
 from gemini_processor import process_daily_report
 from email_sender import EmailSender
 from logging_config import setup_logging
@@ -63,13 +62,7 @@ def generate_daily_report():
         
         # 4. 生成邮件
         logger.info("\n[4/4] 生成邮件...")
-        sender = EmailSender(
-            config.SMTP_SERVER,
-            config.SMTP_PORT,
-            config.SENDER_EMAIL,
-            config.SENDER_PASSWORD,
-            config.SENDER_NAME
-        )
+        sender = create_sender()
         
         # 准备邮件数据
         processed_data = {
@@ -92,59 +85,15 @@ def generate_daily_report():
         raise
 
 
-def create_test_email() -> str:
-    """创建简单的测试邮件（不消耗API token）"""
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-    html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <style>
-        body {{
-            font-family: 'Microsoft YaHei', Arial, sans-serif;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 40px 20px;
-            background-color: #f9f9f9;
-        }}
-        .container {{
-            background-color: #ffffff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            text-align: center;
-        }}
-        h1 {{
-            color: #2c3e50;
-            font-size: 24px;
-            margin-bottom: 20px;
-        }}
-        p {{
-            color: #555;
-            line-height: 1.6;
-            margin: 10px 0;
-        }}
-        .success {{
-            color: #27ae60;
-            font-weight: bold;
-            font-size: 18px;
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>邮件测试</h1>
-        <p class="success">邮件配置正常</p>
-        <p>如果您收到这封邮件，说明SMTP配置正确。</p>
-        <p>时间: {current_time}</p>
-    </div>
-</body>
-</html>
-    """
-
-    return html
+def create_sender() -> EmailSender:
+    """按当前配置创建邮件发送器"""
+    return EmailSender(
+        config.SMTP_SERVER,
+        config.SMTP_PORT,
+        config.SENDER_EMAIL,
+        config.SENDER_PASSWORD,
+        config.SENDER_NAME
+    )
 
 
 def run_checks():
@@ -190,7 +139,7 @@ def run_checks():
     # 3. 新闻源（抽检 Nature RSS）
     logger.info("\n[3] 新闻数据源")
     with check("Nature RSS 可达"):
-        r = requests.get("https://www.nature.com/nature.rss", timeout=15, headers={
+        r = requests.get(NATURE_RSS_URL, timeout=15, headers={
             'User-Agent': 'Mozilla/5.0'
         })
         if r.status_code != 200:
@@ -199,13 +148,7 @@ def run_checks():
     # 4. SMTP（AI 服务不再预检：运行时多模型回退链自带探活，预检只会额外消耗 RPM）
     logger.info("\n[4] 邮件服务")
     with check("SMTP 连接"):
-        if config.SMTP_PORT == 465:
-            server = smtplib.SMTP_SSL(config.SMTP_SERVER, config.SMTP_PORT, timeout=15)
-        else:
-            server = smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=15)
-            server.starttls()
-        server.login(config.SENDER_EMAIL, config.SENDER_PASSWORD)
-        server.quit()
+        create_sender().test_connection()
 
     # 汇总
     logger.info("\n" + "=" * 60)
@@ -246,14 +189,8 @@ def main():
             logger.info("邮件测试模式")
             logger.info("=" * 60)
             
-            html_content = create_test_email()
-            sender = EmailSender(
-                config.SMTP_SERVER,
-                config.SMTP_PORT,
-                config.SENDER_EMAIL,
-                config.SENDER_PASSWORD,
-                config.SENDER_NAME
-            )
+            sender = create_sender()
+            html_content = sender.create_test_email()
 
             subject = f"邮件测试 - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
             logger.info(f"\n正在发送测试邮件到: {', '.join(config.RECEIVER_EMAILS)}")

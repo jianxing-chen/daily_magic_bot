@@ -1,18 +1,16 @@
 [project]
 name = "daily-magic-bot"
-version = "2.5.0"
+version = "2.6.0"
 description = "每日魔法报告机器人 - AI驱动的科学新闻邮件推送"
 requires-python = ">=3.10"
-dependencies = [
-    "google-genai>=1.0.0,<2.0.0",
-    "beautifulsoup4>=4.12.0,<5.0.0",
-    "requests>=2.31.0,<3.0.0",
-    "python-dotenv>=1.0.0,<2.0.0",
-    "lxml>=4.9.0,<6.0.0",
-    "feedparser>=6.0.0,<7.0.0",
-    "jinja2>=3.1.0,<4.0.0",
-    "aiohttp>=3.9.0,<4.0.0",
-]
+# 依赖唯一事实源：requirements.txt（开发依赖另见 requirements-dev.txt）
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [build-system]
 requires = ["setuptools>=68.0"]

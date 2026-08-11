@@ -38,6 +38,8 @@ MAX_CONTENT_LENGTH = 5000     # 单篇文章全文最大长度（字符）
 REQUEST_TIMEOUT = 15          # HTTP 请求超时（秒）
 FETCH_TIMEOUT = 20            # 单源并行任务超时（秒）
 
+NATURE_RSS_URL = 'https://www.nature.com/nature.rss'  # Nature 主刊 RSS（预检抽检也复用此常量）
+
 
 class MultiSourceNewsFetcher:
     """多源科学新闻获取器"""
@@ -59,7 +61,7 @@ class MultiSourceNewsFetcher:
         }
         # Nature 系列 RSS
         self.nature_rss = {
-            'nature': ('https://www.nature.com/nature.rss', 'Nature'),
+            'nature': (NATURE_RSS_URL, 'Nature'),
             'nature_astro': ('https://www.nature.com/natastron.rss', 'Nature Astronomy'),
             'nature_psych': ('https://www.nature.com/nrpsychol.rss', 'Nature Reviews Psychology'),
             'nature_comms': ('https://www.nature.com/ncomms.rss', 'Nature Communications'),
