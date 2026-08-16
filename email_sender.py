@@ -145,7 +145,7 @@ class EmailSender:
             # 心理学专门源
             'PsyPost': 'PsyPost',
             'Neuroscience News': 'Neuro News',
-            'PNAS Psychology': 'PNAS',
+            'Medical Xpress': 'Med Xpress',
         }
         return source_map.get(source, source)
 

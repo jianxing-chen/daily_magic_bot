@@ -36,6 +36,8 @@ MAX_RSS_ITEMS = 60            # Nature/Science RSS 最大条数
 MAX_SCIENCEDAILY_ITEMS = 40   # ScienceDaily/心理学源最大条数
 REQUEST_TIMEOUT = 15          # HTTP 请求超时（秒）
 FETCH_TIMEOUT = 20            # 单源并行任务超时（秒）
+MIN_NEWS_THRESHOLD = 15       # 过滤后新闻低于此数时逐步放宽时间窗（AI 需从中选 15-20 条）
+MAX_FILTER_DAYS = 3           # 时间窗放宽上限（天）
 
 NATURE_RSS_URL = 'https://www.nature.com/nature.rss'  # Nature 主刊 RSS（预检抽检也复用此常量）
 
@@ -80,7 +82,7 @@ class MultiSourceNewsFetcher:
         self.psychology_rss = {
             'psypost': ('https://www.psypost.org/feed/', 'PsyPost'),
             'neuroscience_news': ('https://neurosciencenews.com/feed/', 'Neuroscience News'),
-            'pnas_psych': ('https://www.pnas.org/action/showFeed?type=searchTopic&taxonomyCode=psych-soc', 'PNAS Psychology'),
+            'medical_xpress': ('https://medicalxpress.com/rss-feed/', 'Medical Xpress'),
         }
     
     def fetch_all_news_titles(self) -> List[Dict]:
@@ -139,9 +141,14 @@ class MultiSourceNewsFetcher:
         
         logger.info(f"去重后: {len(unique_news)} 条")
         
-        # 过滤最近1天的新闻
+        # 过滤最近1天的新闻；若部分源失败导致信息量不足，逐步放宽时间窗补量
         recent_news = self._filter_recent_news(unique_news, days=1)
-        logger.info(f"过滤后保留最近1天的新闻: {len(recent_news)} 条")
+        days = 1
+        while len(recent_news) < MIN_NEWS_THRESHOLD and days < MAX_FILTER_DAYS:
+            days += 1
+            recent_news = self._filter_recent_news(unique_news, days=days)
+            logger.info(f"新闻不足 {MIN_NEWS_THRESHOLD} 条，放宽到最近 {days} 天: {len(recent_news)} 条")
+        logger.info(f"过滤后保留最近 {days} 天的新闻: {len(recent_news)} 条")
         
         return recent_news
     

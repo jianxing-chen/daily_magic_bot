@@ -15,7 +15,7 @@
   - **Nature 系列**：Nature News (网页) + Nature / Nature Astronomy / Nature Reviews Psychology / Nature Communications (RSS)
   - **Science** 杂志 (RSS)
   - **ScienceDaily RSS**：Mind & Brain / Top Science / Top News / Space & Time
-  - **心理学专门源**：PsyPost / Neuroscience News / PNAS Psychology
+  - **心理学专门源**：PsyPost / Neuroscience News / Medical Xpress
   - 覆盖范围：去重后约 **300+ 条**新闻，过滤后保留最近 1 天内
   - ⚡ **多线程并行抓取**（8 线程），新闻获取速度提升 ~5 倍
   
