@@ -1,6 +1,11 @@
 {% extends "email_base.html" %}
 
 {% block content %}
+<!-- AI Model Tag -->
+{%- if model %}
+<div class="model-tag">🤖 {{ model }}</div>
+{%- endif %}
+
 <!-- Greeting -->
 <div class="greeting">
     <div style="font-weight:700; font-size:18px; color:#0f766e; margin-bottom:10px; letter-spacing:0.5px;">

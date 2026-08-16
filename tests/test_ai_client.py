@@ -39,6 +39,7 @@ class TestCrossVendorFallback:
             result = client.call('测试prompt', use_json=True)
 
         assert result == '{"ok": 1}'
+        assert client.last_used_model == 'deepseek-v4-flash'
         # 请求体正确：URL / 模型 / JSON 模式 / Bearer 鉴权
         call = mock_post.call_args
         assert call.args[0] == 'https://api.deepseek.com/chat/completions'
@@ -64,7 +65,7 @@ class TestCrossVendorFallback:
 
 
 class TestGeminiChain:
-    def _chain_client(self, fail_models=('gemini-3.5-flash',)):
+    def _chain_client(self, fail_models=('gemini-3.7-flash',)):
         """构造 mock genai 客户端：指定模型抛 503，其余成功"""
         client = make_client(DEEPSEEK_KEY_PLACEHOLDER)
         calls = []
@@ -82,19 +83,20 @@ class TestGeminiChain:
         return client, calls
 
     def test_model_fallback_sequence(self):
-        """3.5-flash 重试耗尽（2 次尝试）→ 切换 3-flash-preview 成功"""
+        """3.7-flash 重试耗尽（2 次尝试）→ 切换 3.5-flash 成功"""
         client, calls = self._chain_client()
         with patch('retry.time.sleep') as mock_sleep:
             result = client._call_gemini_chain('测试')
 
         assert result == '成功'
-        assert calls == ['gemini-3.5-flash', 'gemini-3.5-flash', 'gemini-3-flash-preview']
+        assert calls == ['gemini-3.7-flash', 'gemini-3.7-flash', 'gemini-3.5-flash']
+        assert client.last_used_model == 'gemini-3.5-flash'
         assert mock_sleep.call_count == 1
         assert mock_sleep.call_args.args[0] == 30  # GEMINI_RETRY_WAITS = [30]
 
     def test_all_models_exhausted_raises(self):
         client, _ = self._chain_client(fail_models=(
-            'gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-pro'))
+            'gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-2.5-pro'))
         with patch('retry.time.sleep'):
             with pytest.raises(RetryableError):
                 client._call_gemini_chain('测试')
@@ -103,7 +105,7 @@ class TestGeminiChain:
         client, calls = self._chain_client(fail_models=())
         result = client._call_gemini_chain('测试')
         assert result == '成功'
-        assert calls == ['gemini-3.5-flash']
+        assert calls == ['gemini-3.7-flash']
 
 
 class TestDeepseekRetry:

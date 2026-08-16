@@ -84,6 +84,8 @@ class GeminiProcessor:
                 logger.warning("selected_news 格式异常，使用默认值")
                 result['selected_news'] = [{"index": i, "category": "C"} for i in range(1, min(16, len(news_list) + 1))]
             
+            # 记录主内容实际使用的 AI 模型（供邮件标签展示）
+            self.used_model = self.ai.last_used_model
             return result
             
         except Exception as e:
@@ -91,6 +93,7 @@ class GeminiProcessor:
             logger.error("⚠️ AI 内容生成彻底失败，本次邮件将使用兜底默认值（无真实 AI 问候/筛选）")
             logger.error(f"最后错误: {e}")
             logger.error("=" * 60)
+            self.used_model = 'fallback'
             return {
                 "greeting": f"{character_name}祝您早安！今天的天气真不错！",
                 "advice_beijing": "请注意天气变化。",
@@ -170,7 +173,8 @@ def process_daily_report(
         'greeting': '',
         'weather_advice': {},
         'processed_news': [],
-        'character': ''
+        'character': '',
+        'model': ''
     }
     
     try:
@@ -188,6 +192,8 @@ def process_daily_report(
             'beijing': master_content.get('advice_beijing', ''),
             'jinan': master_content.get('advice_jinan', '')
         }
+        # 主内容实际使用的 AI 模型（供邮件开头标签展示）
+        result['model'] = getattr(processor, 'used_model', '') or ''
         
         # 3. 处理选中的新闻
         selected_news = master_content.get('selected_news', [])

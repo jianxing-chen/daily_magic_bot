@@ -25,6 +25,19 @@ body {
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
+/* --- AI Model Tag --- */
+.model-tag {
+    display: inline-block;
+    font-size: 12px;
+    color: #0f766e;
+    background-color: #f0fdfa;
+    border: 1px solid #ccfbf1;
+    border-radius: 999px;
+    padding: 4px 12px;
+    margin-bottom: 16px;
+    letter-spacing: 0.3px;
+}
+
 /* --- Greeting Card --- */
 .greeting {
     font-size: 16px;

@@ -76,6 +76,7 @@ class EmailSender:
             'css': self.css,
             'character': processed_data.get('character', '神秘来客'),
             'greeting': processed_data.get('greeting', '早安！'),
+            'model': processed_data.get('model', ''),
             'beijing_weather': weather_data.get('beijing', {}),
             'jinan_weather': weather_data.get('jinan', {}),
             'beijing_advice': processed_data.get('weather_advice', {}).get('beijing', ''),

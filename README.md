@@ -31,7 +31,7 @@
   - **智能融合**：哈利波特角色开场白智能融合当日天气与科学大新闻
   - **批量处理**：一次性完成多条新闻的翻译与总结，摘要长度根据输入内容自适应（100-400 字）
   - **指数退避重试**：自动处理 503/429 等临时错误（Gemini 链 30s → 60s）
-  - **多模型回退 + 跨厂商兜底**：gemini-3.5-flash → 3-flash-preview → 2.5-pro → DeepSeek V4 Flash（需配置 DEEPSEEK_API_KEY）
+  - **多模型回退 + 跨厂商兜底**：gemini-3.7-flash → 3.5-flash → 2.5-pro → DeepSeek V4 Flash（需配置 DEEPSEEK_API_KEY）
   - **返回值校验**：AI 输出 schema 校验 + 降级兜底，确保邮件始终可发送
   - 筛选结果：15-20 条精选新闻（A/B/C 三领域，C 领域严格把关宁缺毋滥）
 

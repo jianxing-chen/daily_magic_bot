@@ -140,12 +140,14 @@ class AiClient:
             deepseek_model: 可选 DeepSeek 模型名（测试注入）
         """
         self.client = genai.Client(api_key=api_key)
-        # 模型回退链：首选 3.5-flash，高峰 503 时依次回退到 3-flash-preview、2.5-pro
-        self.models = ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-pro']
+        # 模型回退链：首选 3.7-flash，高峰 503 时依次回退到 3.5-flash、2.5-pro
+        self.models = ['gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-2.5-pro']
         # DeepSeek 兜底配置（Gemini 链全部失效时启用）
         self.deepseek_api_key = deepseek_api_key if deepseek_api_key is not None else config.DEEPSEEK_API_KEY
         self.deepseek_base_url = deepseek_base_url or config.DEEPSEEK_BASE_URL
         self.deepseek_model = deepseek_model or config.DEEPSEEK_MODEL
+        # 最近一次成功调用使用的模型名（供邮件标签展示）
+        self.last_used_model = None
 
     @property
     def deepseek_enabled(self) -> bool:
@@ -238,11 +240,13 @@ class AiClient:
 
         for model_idx, model_name in enumerate(self.models):
             try:
-                return retry_with_backoff(
+                text = retry_with_backoff(
                     lambda m=model_name: attempt_model(m),
                     waits=GEMINI_RETRY_WAITS,
                     label=model_name
                 )
+                self.last_used_model = model_name
+                return text
             except RetryableError:
                 # 当前模型重试耗尽
                 if model_idx < len(self.models) - 1:
@@ -304,4 +308,6 @@ class AiClient:
                 raise RetryableError(msg)
             raise RuntimeError(msg)
 
-        return retry_with_backoff(attempt, waits=DEEPSEEK_RETRY_WAITS, label='DeepSeek')
+        result = retry_with_backoff(attempt, waits=DEEPSEEK_RETRY_WAITS, label='DeepSeek')
+        self.last_used_model = self.deepseek_model
+        return result

@@ -58,6 +58,7 @@ def generate_daily_report():
         ai_result = process_daily_report(weather_data, news_list)
         
         logger.info(f"  - 角色: {ai_result['character']}")
+        logger.info(f"  - 处理模型: {ai_result.get('model', '未知')}")
         logger.info(f"  - 筛选出 {len(ai_result['processed_news'])} 条重点新闻")
         
         # 4. 生成邮件
@@ -68,7 +69,8 @@ def generate_daily_report():
         processed_data = {
             'greeting': ai_result['greeting'],
             'character': ai_result['character'],
-            'weather_advice': ai_result['weather_advice']
+            'weather_advice': ai_result['weather_advice'],
+            'model': ai_result.get('model', '')
         }
         processed_news = ai_result['processed_news']
         

@@ -37,7 +37,8 @@ MOCK_PROCESSED = {
     'weather_advice': {
         'beijing': '建议穿保暖外套，注意防寒。',
         'jinan': '温度适宜，可以穿薄外套。'
-    }
+    },
+    'model': 'gemini-3.5-flash'
 }
 
 # Mock 新闻数据（覆盖 A/B/C 三分类）
@@ -93,6 +94,10 @@ def test_email_renders_full_html():
     assert '邓布利多' in html
     assert '早安！' in html
 
+    # AI 模型标签（邮件开头）
+    assert 'class="model-tag"' in html
+    assert 'gemini-3.5-flash' in html
+
     # 天气卡片（双城 + 预警 + 建议）
     assert '北京' in html and '济南' in html
     assert '5~15°C' in html
@@ -113,6 +118,13 @@ def test_email_renders_without_news():
     html = make_sender().create_html_email(MOCK_WEATHER, MOCK_PROCESSED, None)
     assert '邓布利多' in html
     assert '科学新闻' not in html  # 无新闻时不渲染新闻区
+
+
+def test_model_tag_hidden_when_empty():
+    # model 为空时不渲染标签块（仅断言 HTML 元素，避开 CSS 类名干扰）
+    processed = dict(MOCK_PROCESSED, model='')
+    html = make_sender().create_html_email(MOCK_WEATHER, processed, None)
+    assert 'class="model-tag"' not in html
 
 
 def test_html_autoescape():
