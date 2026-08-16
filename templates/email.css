@@ -50,14 +50,25 @@ body {
 }
 
 /* --- Weather Cards --- */
+/* 双卡并排采用表格布局（见 email.html），Gmail 网页版不支持 display:flex */
 .weather-container {
-    display: flex;
-    justify-content: space-between;
-    gap: 20px;
+    width: 100%;
+}
+
+.weather-cell {
+    width: 50%;
+    vertical-align: top;
+}
+
+.weather-cell-left {
+    padding-right: 10px;
+}
+
+.weather-cell-right {
+    padding-left: 10px;
 }
 
 .weather-card {
-    flex: 1;
     background: linear-gradient(180deg, #f0fdfa 0%, #ffffff 100%);
     padding: 24px 20px 20px;
     border: 1px solid #ccfbf1;
@@ -239,8 +250,16 @@ body {
     }
 
     .weather-container {
-        flex-direction: column;
-        gap: 14px;
+        width: 100%;
+    }
+
+    /* 窄屏时双卡改为纵向堆叠 */
+    .weather-cell,
+    .weather-cell-left,
+    .weather-cell-right {
+        display: block;
+        width: 100%;
+        padding: 0 0 14px 0;
     }
 
     .weather-card {

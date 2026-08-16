@@ -13,14 +13,21 @@
 
 <!-- Weather -->
 <h2 class="section-title">今日天气</h2>
-<div class="weather-container">
-    {% with city_name='北京', weather=beijing_weather, advice=beijing_advice %}
-        {% include "weather_card.html" %}
-    {% endwith %}
-    {% with city_name='济南', weather=jinan_weather, advice=jinan_advice %}
-        {% include "weather_card.html" %}
-    {% endwith %}
-</div>
+{# Gmail 网页版不支持 display:flex，双卡并排改用邮件标准的表格布局 #}
+<table class="weather-container" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+        <td class="weather-cell weather-cell-left" width="50%" valign="top">
+            {% with city_name='北京', weather=beijing_weather, advice=beijing_advice %}
+                {% include "weather_card.html" %}
+            {% endwith %}
+        </td>
+        <td class="weather-cell weather-cell-right" width="50%" valign="top">
+            {% with city_name='济南', weather=jinan_weather, advice=jinan_advice %}
+                {% include "weather_card.html" %}
+            {% endwith %}
+        </td>
+    </tr>
+</table>
 
 <!-- News -->
 {%- if categories %}

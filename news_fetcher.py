@@ -34,7 +34,6 @@ MAX_WORKERS = 8               # 并行抓取线程数
 MAX_NATURE_ARTICLES = 50      # Nature 网页抓取最大条数
 MAX_RSS_ITEMS = 60            # Nature/Science RSS 最大条数
 MAX_SCIENCEDAILY_ITEMS = 40   # ScienceDaily/心理学源最大条数
-MAX_CONTENT_LENGTH = 5000     # 单篇文章全文最大长度（字符）
 REQUEST_TIMEOUT = 15          # HTTP 请求超时（秒）
 FETCH_TIMEOUT = 20            # 单源并行任务超时（秒）
 

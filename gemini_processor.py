@@ -13,14 +13,6 @@ from async_news_fetcher import fetch_articles_async
 from ai_client import AiClient, parse_ai_json
 from prompts import build_master_prompt, build_batch_prompt
 
-# 向后兼容 re-export：历史调用方/测试可继续从本模块导入
-from ai_client import strip_json_comments as _strip_json_comments, parse_ai_json as parse_ai_json  # noqa: F811
-from prompts import (  # noqa: F401
-    clean_text as _clean_text,
-    format_city_weather as _format_city_weather,
-    DESC_PREVIEW_LENGTH, TITLE_MAX_LENGTH, MAX_CONTENT_PREVIEW,
-)
-
 logger = logging.getLogger(__name__)
 
 

@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light">
     <style>
-        {{ css }}
+        {# css 为本地静态文件（无用户输入），用 safe 避免 autoescape 转义 CSS 中的引号导致 Gmail 丢弃样式 #}
+        {{ css | safe }}
     </style>
 </head>
 <body>

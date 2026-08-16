@@ -1,6 +1,6 @@
 [project]
 name = "daily-magic-bot"
-version = "2.6.0"
+version = "2.7.0"
 description = "每日魔法报告机器人 - AI驱动的科学新闻邮件推送"
 requires-python = ">=3.10"
 # 依赖唯一事实源：requirements.txt（开发依赖另见 requirements-dev.txt）
