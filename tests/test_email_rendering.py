@@ -127,6 +127,32 @@ def test_model_tag_hidden_when_empty():
     assert 'class="model-tag"' not in html
 
 
+def test_model_tag_renders_real_model_name():
+    # model 标签始终展示真实模型名（原样透传，不做任何映射）
+    processed = dict(MOCK_PROCESSED, model='deepseek-v4-flash')
+    html = make_sender().create_html_email(MOCK_WEATHER, processed, None)
+    assert 'class="model-tag"' in html
+    assert 'deepseek-v4-flash' in html
+
+
+def test_email_renders_weather_aware_last_resort_content():
+    # 极端保底数据（AI 全挂，无模型标签）渲染不报错且内容完整
+    processed = {
+        'greeting': '邓布利多祝您早安！今天北京雷阵雨，23~30°C。',
+        'character': '邓布利多',
+        'weather_advice': {
+            'beijing': '当前有预警：雷电黄色预警，请注意防范。',
+            'jinan': '出行记得带伞。'
+        },
+        'model': ''  # 无真实模型 → 标签隐藏
+    }
+    html = make_sender().create_html_email(MOCK_WEATHER, processed, None)
+    assert '今天北京雷阵雨' in html
+    assert '雷电黄色预警' in html
+    assert '出行记得带伞' in html
+    assert 'class="model-tag"' not in html
+
+
 def test_html_autoescape():
     # XSS 防御：注入内容应被转义
     processed = dict(MOCK_PROCESSED, greeting='<script>alert(1)</script>')

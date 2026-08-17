@@ -12,8 +12,15 @@ from config import config
 from async_news_fetcher import fetch_articles_async
 from ai_client import AiClient, parse_ai_json
 from prompts import build_master_prompt, build_batch_prompt
+from retry import retry_with_backoff
 
 logger = logging.getLogger(__name__)
+
+# 全流程重试退避：每轮都走完整的「Gemini 三模型回退链 + DeepSeek 兜底」；
+# API 临时高峰（503）与偶发的非法 JSON 返回通常可在后续轮次恢复，
+# 确保问候/建议/总结由真实 AI 生成
+MASTER_RETRY_WAITS = [60, 120]   # 主内容：最多 3 轮
+BATCH_RETRY_WAITS = [60]         # 新闻批量处理：最多 2 轮
 
 
 class GeminiProcessor:
@@ -41,6 +48,9 @@ class GeminiProcessor:
             deepseek_base_url=deepseek_base_url,
             deepseek_model=deepseek_model
         )
+        # 主内容实际使用的模型名（供邮件标签展示）；调用前置空，
+        # 避免 generate_master_content 未被调用时 getattr 依赖属性存在性
+        self.used_model = None
         logger.info("AI处理器初始化成功")
 
     @property
@@ -51,16 +61,19 @@ class GeminiProcessor:
     def generate_master_content(self, character_name: str, weather_info: Dict, news_list: List[Dict]) -> Dict:
         """
         一次性生成所有AI内容：问候（含新闻综述）、天气建议、新闻筛选
-        
+
+        全流程最多重试 3 轮（MASTER_RETRY_WAITS），每轮走完整的
+        Gemini 三模型回退链 + DeepSeek 兜底，确保问候/建议由真实 AI 生成。
+
         Args:
             character_name: 角色名称
             weather_info: 天气数据
             news_list: 原始新闻列表（包含 title, url, source, date）
-            
+
         Returns:
             JSON字典包含 greeting, advice_beijing, advice_jinan, selected_news
         """
-        try:
+        def attempt():
             prompt = build_master_prompt(character_name, weather_info, news_list)
             response_text = self.ai.call(prompt, use_json=True)
 
@@ -68,7 +81,7 @@ class GeminiProcessor:
             result = parse_ai_json(response_text, "主内容生成")
             if not isinstance(result, dict):
                 raise ValueError(f"返回 JSON 顶层类型异常: {type(result).__name__}")
-            
+
             # 校验必要字段
             required_keys = ['greeting', 'advice_beijing', 'advice_jinan', 'selected_news']
             for key in required_keys:
@@ -78,51 +91,119 @@ class GeminiProcessor:
                         result[key] = [{"index": i, "category": "C"} for i in range(1, min(16, len(news_list) + 1))]
                     else:
                         result[key] = ''
-            
+
             # 校验 selected_news 格式
             if not isinstance(result.get('selected_news'), list):
                 logger.warning("selected_news 格式异常，使用默认值")
                 result['selected_news'] = [{"index": i, "category": "C"} for i in range(1, min(16, len(news_list) + 1))]
-            
-            # 记录主内容实际使用的 AI 模型（供邮件标签展示）
+
+            # 记录主内容实际使用的 AI 模型（供邮件标签展示，始终为真实模型名）
             self.used_model = self.ai.last_used_model
             return result
-            
+
+        try:
+            return retry_with_backoff(
+                attempt,
+                waits=MASTER_RETRY_WAITS,
+                label='主内容生成',
+                # 高峰 503/非法 JSON/网络抖动均值得再试一轮；永久错误最多多耗退避时间
+                retryable=lambda e: True
+            )
         except Exception as e:
             logger.error("=" * 60)
-            logger.error("⚠️ AI 内容生成彻底失败，本次邮件将使用兜底默认值（无真实 AI 问候/筛选）")
+            logger.error("⚠️ AI 内容生成在所有重试轮次后仍失败，启用天气感知保底文案（极端情况）")
             logger.error(f"最后错误: {e}")
             logger.error("=" * 60)
-            self.used_model = 'fallback'
+            # 无真实模型可用：used_model 置空，邮件将隐藏模型标签（不显示虚假名称）
+            self.used_model = None
             return {
-                "greeting": f"{character_name}祝您早安！今天的天气真不错！",
-                "advice_beijing": "请注意天气变化。",
-                "advice_jinan": "请注意天气变化。",
+                "greeting": self._fallback_greeting(character_name, weather_info),
+                "advice_beijing": self._fallback_advice(weather_info.get('beijing', {})),
+                "advice_jinan": self._fallback_advice(weather_info.get('jinan', {})),
                 "selected_news": [{"index": i, "category": "C"} for i in range(1, min(16, len(news_list) + 1))]
             }
+    
+    def _fallback_greeting(self, character_name: str, weather_info: Dict) -> str:
+        """构造兜底问候：基于真实天气数据而非通用套话
+    
+        Args:
+            character_name: 角色名称
+            weather_info: 双城天气数据（beijing/jinan 子字典）
+    
+        Returns:
+            结合北京实际天气的问候文本
+        """
+        bj = weather_info.get('beijing', {}) or {}
+        weather = bj.get('weather', '')
+        temperature = bj.get('temperature', '')
+        if weather and temperature:
+            weather_desc = f"今天北京{weather}，{temperature}。"
+        elif weather:
+            weather_desc = f"今天北京{weather}。"
+        else:
+            weather_desc = "今天的天气真不错！"
+        return f"{character_name}祝您早安！{weather_desc}"
+    
+    def _fallback_advice(self, city_weather: Dict) -> str:
+        """构造兜底天气建议：基于真实天气数据而非通用套话
+    
+        优先提示预警，其次按天气现象/风力/低温生成建议；
+        无任何可用信息时才退回通用提示。
+    
+        Args:
+            city_weather: 单城市天气字典（weather/temperature/wind/alerts）
+    
+        Returns:
+            结合实际天气的建议文本
+        """
+        city_weather = city_weather or {}
+        alerts = city_weather.get('alerts') or []
+        if alerts:
+            return f"当前有预警：{alerts[0]}，请注意防范。"
+    
+        tips = []
+        weather = city_weather.get('weather', '')
+        if any(kw in weather for kw in ['雨', '雪', '雷']):
+            tips.append('出行记得带伞')
+        elif '晴' in weather:
+            tips.append('日照较强，注意防晒补水')
+    
+        wind = city_weather.get('wind', '')
+        digits = ''.join(ch for ch in wind if ch.isdigit())
+        if digits and int(digits) >= 4:
+            tips.append('风力较大，注意防风')
+    
+        temperature = city_weather.get('temperature', '')
+        leading = ''.join(ch for ch in temperature.split('~')[0] if ch.isdigit() or ch == '-')
+        if leading and int(leading) <= 5:
+            tips.append('气温偏低，注意保暖')
+    
+        return '，'.join(tips) + '。' if tips else '请注意天气变化。'
 
     def process_news_batch(self, articles: List[Dict]) -> List[Dict]:
         """
         批量处理新闻：一次性完成标题翻译和内容总结
-        
+
+        全流程最多重试 2 轮（BATCH_RETRY_WAITS），每轮走完整的
+        Gemini 三模型回退链 + DeepSeek 兜底，确保翻译/总结由真实 AI 生成。
+
         Args:
             articles: 文章列表 [{'title': '...', 'content': '...', 'url': '...'}]
-            
+
         Returns:
             处理后的列表 [{'title_en': '...', 'title_cn': '...', 'summary': '...', 'url': '...'}]
         """
-        try:
+        def attempt():
             prompt = build_batch_prompt(articles)
             response_text = self.ai.call(prompt, use_json=True)
 
             # 健壮解析：容错代码块围栏/注释/尾逗号，失败时打印原文便于定位
             results = parse_ai_json(response_text, "新闻批量处理")
-            
-            # 校验返回列表格式
+
+            # 非列表视为失败并触发重试（此前静默降级会直接丢失全部新闻）
             if not isinstance(results, list):
-                logger.warning(f"AI返回非列表格式: {type(results)}，尝试降级处理")
-                results = []
-            
+                raise ValueError(f"AI返回非列表格式: {type(results).__name__}")
+
             # 合并结果
             processed_news = []
             for i, res in enumerate(results):
@@ -133,12 +214,19 @@ class GeminiProcessor:
                         'summary': res.get('summary', '暂无总结'),
                         'url': articles[i]['url']
                     })
-            
+
             return processed_news
-            
+
+        try:
+            return retry_with_backoff(
+                attempt,
+                waits=BATCH_RETRY_WAITS,
+                label='新闻批量处理',
+                retryable=lambda e: True
+            )
         except Exception as e:
             logger.error("=" * 60)
-            logger.error("⚠️ 新闻批量处理彻底失败，摘要将显示为占位文本（无真实 AI 翻译/摘要）")
+            logger.error("⚠️ 新闻批量处理在所有重试轮次后仍失败，摘要将显示为占位文本（极端情况）")
             logger.error(f"最后错误: {e}")
             logger.error("=" * 60)
             # 降级处理：返回原始数据
@@ -240,6 +328,8 @@ def process_daily_report(
         
     except Exception as e:
         logger.error(f"处理每日报告失败: {e}")
+        # 保证 model 读取不抛异常；无真实模型（AI 全挂）时为空，邮件将隐藏模型标签
+        result['model'] = getattr(processor, 'used_model', '') or ''
     
     return result
 

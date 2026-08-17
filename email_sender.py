@@ -72,6 +72,7 @@ class EmailSender:
             HTML邮件内容
         """
         # 准备模板上下文
+        # model 始终为真实模型名（Gemini/DeepSeek）；AI 全挂时为空，模板会隐藏标签块
         context = {
             'css': self.css,
             'character': processed_data.get('character', '神秘来客'),
