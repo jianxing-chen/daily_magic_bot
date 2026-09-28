@@ -129,10 +129,10 @@ def test_model_tag_hidden_when_empty():
 
 def test_model_tag_renders_real_model_name():
     # model 标签始终展示真实模型名（原样透传，不做任何映射）
-    processed = dict(MOCK_PROCESSED, model='deepseek-v4-flash')
+    processed = dict(MOCK_PROCESSED, model='deepseek-flash')
     html = make_sender().create_html_email(MOCK_WEATHER, processed, None)
     assert 'class="model-tag"' in html
-    assert 'deepseek-v4-flash' in html
+    assert 'deepseek-flash' in html
 
 
 def test_email_renders_weather_aware_last_resort_content():

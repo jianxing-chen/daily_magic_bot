@@ -30,7 +30,7 @@ class Config:
         # DeepSeek API配置（Gemini 全部失效时的兜底模型，可选）
         self.DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', DEEPSEEK_KEY_PLACEHOLDER)
         self.DEEPSEEK_BASE_URL = os.getenv('DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
-        self.DEEPSEEK_MODEL = os.getenv('DEEPSEEK_MODEL', 'deepseek-v4-flash')
+        self.DEEPSEEK_MODEL = os.getenv('DEEPSEEK_MODEL', 'deepseek-flash')
 
         # 邮箱配置
         self.SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')

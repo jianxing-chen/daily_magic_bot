@@ -10,7 +10,7 @@ import logging
 
 from config import config
 from async_news_fetcher import fetch_articles_async
-from ai_client import AiClient, parse_ai_json
+from ai_client import AiClient, parse_ai_json, RAW_TEXT_LOG_LIMIT
 from prompts import build_master_prompt, build_batch_prompt
 from retry import retry_with_backoff
 
@@ -200,8 +200,18 @@ class GeminiProcessor:
             # 健壮解析：容错代码块围栏/注释/尾逗号，失败时打印原文便于定位
             results = parse_ai_json(response_text, "新闻批量处理")
 
+            # DeepSeek json_object 模式强制输出顶层为对象，要求的列表常被包成 {"key": [...]}；
+            # 对象内含唯一列表值时解包继续（含包裹键名外的标量字段也可），否则视为失败触发重试
+            if isinstance(results, dict):
+                list_values = [v for v in results.values() if isinstance(v, list)]
+                if len(list_values) == 1:
+                    logger.warning("AI返回顶层为对象，已解包内嵌列表继续处理")
+                    results = list_values[0]
+
             # 非列表视为失败并触发重试（此前静默降级会直接丢失全部新闻）
             if not isinstance(results, list):
+                logger.error(f"AI返回非列表（原始文本前 {RAW_TEXT_LOG_LIMIT} 字符）: "
+                             f"{response_text[:RAW_TEXT_LOG_LIMIT]}")
                 raise ValueError(f"AI返回非列表格式: {type(results).__name__}")
 
             # 合并结果

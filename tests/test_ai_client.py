@@ -39,12 +39,13 @@ class TestCrossVendorFallback:
             result = client.call('测试prompt', use_json=True)
 
         assert result == '{"ok": 1}'
-        assert client.last_used_model == 'deepseek-v4-flash'
+        assert client.last_used_model == 'deepseek-flash'
         # 请求体正确：URL / 模型 / JSON 模式 / Bearer 鉴权
         call = mock_post.call_args
         assert call.args[0] == 'https://api.deepseek.com/chat/completions'
-        assert call.kwargs['json']['model'] == 'deepseek-v4-flash'
+        assert call.kwargs['json']['model'] == 'deepseek-flash'
         assert call.kwargs['json']['response_format'] == {'type': 'json_object'}
+        assert call.kwargs['json']['thinking'] == {'type': 'disabled'}
         assert call.kwargs['headers']['Authorization'] == 'Bearer sk-test-real-key'
 
     def test_deepseek_disabled_raises_original_error(self):

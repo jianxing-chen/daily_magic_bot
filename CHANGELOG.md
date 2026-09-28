@@ -2,6 +2,13 @@
 
 本文件记录每日魔法报告 (Daily Magic Bot) 的全部版本变更。
 
+### v2.7.1 (2026-09-28)
+- 🛡️ **DeepSeek 兜底修复（新闻批量处理必现失败）**：
+  - 根因：`response_format: json_object` 强制输出顶层为对象，而新闻批量处理要求 JSON 列表，DeepSeek 兜底一旦被启用必以 `AI返回非列表格式: dict` 失败（2026-09-28 Gemini 三模型全挂时首次暴露，邮件新闻摘要显示占位文案）
+  - 修复：`process_news_batch` 对 dict 返回自动解包（对象内含唯一列表值时取出继续，含多个列表或无列表仍触发重试并打印原始返回文本）
+- 🔄 **DeepSeek 模型名更新**：`deepseek-v4-flash` → `deepseek-flash`（V4.1-Flash；旧名对应模型已下线，官方建议迁移至新名称）
+- ⚡ **DeepSeek 关闭思考模式**：V4.1-Flash 默认开启思考（实测简单请求即消耗约 2000 reasoning token、延迟 60s+），翻译/总结场景在请求中显式 `thinking: disabled`，兜底路径更快更省
+
 ### v2.7 (2026-08-16)
 - 🎨 **Gmail 渲染兼容性修复**：
   - 天气双卡布局从 `display: flex`（Gmail 网页版不支持）改为邮件标准的表格双列布局，窄屏 `@media` 下纵向堆叠

@@ -140,6 +140,45 @@ class TestNewsBatchRetry:
         assert proc.ai.call.call_count == len(BATCH_RETRY_WAITS) + 1  # 2 轮
         assert result[0]['summary'] == 'AI处理失败，请查看原文'
 
+    def test_batch_dict_wrapped_list_unwrapped(self):
+        # DeepSeek json_object 模式强制顶层为对象：单键包裹的列表解包后直接成功，不浪费重试
+        proc = make_processor()
+        proc.ai.call.return_value = json.dumps({
+            'news': [{'title_cn': '中文标题', 'summary': '总结内容'}],
+            'note': '附带说明字段不影响解包'
+        })
+
+        result = proc.process_news_batch([{'title': 'T', 'content': 'C', 'url': 'u'}])
+
+        assert result[0]['title_cn'] == '中文标题'
+        assert result[0]['summary'] == '总结内容'
+        assert proc.ai.call.call_count == 1
+
+    def test_batch_dict_without_list_fails_to_placeholder(self):
+        # 对象内无列表值（无法解包）→ 与其他失败一样触发重试直至占位
+        proc = make_processor()
+        proc.ai.call.side_effect = ['{"error": "no list"}', '{"error": "no list"}']
+
+        with patch('retry.time.sleep'):
+            result = proc.process_news_batch([{'title': 'T', 'content': 'C', 'url': 'u'}])
+
+        assert proc.ai.call.call_count == len(BATCH_RETRY_WAITS) + 1
+        assert result[0]['summary'] == 'AI处理失败，请查看原文'
+
+    def test_batch_ambiguous_multi_list_dict_retries(self):
+        # 对象内含多个列表（无法确定哪个是结果）→ 不猜测，触发重试
+        proc = make_processor()
+        proc.ai.call.side_effect = [
+            json.dumps({'news': [{'title_cn': 'A', 'summary': 'S'}], 'other': [1, 2]}),
+            VALID_BATCH_JSON
+        ]
+
+        with patch('retry.time.sleep'):
+            result = proc.process_news_batch([{'title': 'T', 'content': 'C', 'url': 'u'}])
+
+        assert proc.ai.call.call_count == 2
+        assert result[0]['title_cn'] == '中文标题'
+
 
 class TestProcessDailyReportModel:
     def test_model_is_real_name_on_success(self):
@@ -222,7 +261,7 @@ class TestModelTagInRealEmail:
             result = proc.generate_master_content('邓布利多', MOCK_WEATHER, MOCK_NEWS)
 
         # 真实链路：Gemini 链 3 模型×2 次全 503 → DeepSeek 成功
-        assert proc.used_model == 'deepseek-v4-flash'
+        assert proc.used_model == 'deepseek-flash'
         assert result['greeting'] == '早安！今天北京雷阵雨，出门带伞。'
 
         html = render_email({
@@ -235,5 +274,5 @@ class TestModelTagInRealEmail:
             'model': proc.used_model
         })
         assert 'class="model-tag"' in html
-        assert 'deepseek-v4-flash' in html  # 标签显示 DeepSeek 真实模型名
+        assert 'deepseek-flash' in html  # 标签显示 DeepSeek 真实模型名
         assert 'fallback' not in html

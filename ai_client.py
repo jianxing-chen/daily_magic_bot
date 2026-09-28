@@ -283,7 +283,11 @@ class AiClient:
         payload = {
             'model': self.deepseek_model,
             'messages': [{'role': 'user', 'content': prompt}],
-            'stream': False
+            'stream': False,
+            # deepseek-flash (V4.1-Flash) 默认开启思考模式：翻译/总结无需推理，
+            # 关闭可避免 reasoning token 按输出计价的成本与 60s+ 延迟，
+            # 并避开 json_object 模式下偶发空 content 的已知问题
+            'thinking': {'type': 'disabled'}
         }
         if use_json:
             payload['response_format'] = {'type': 'json_object'}
