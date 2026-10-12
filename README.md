@@ -52,7 +52,10 @@ daily_magic_bot/
 ├── weather_parser.py      # 天气数据解析（容错 + 默认值）
 ├── news_fetcher.py        # 新闻获取（13源并行抓取 + Session连接池）
 ├── async_news_fetcher.py  # 异步文章详情抓取（aiohttp 并发）
+├── prompts.py             # AI 提示词构造
+├── ai_client.py           # AI 请求传输（Gemini 回退链 + DeepSeek 兜底）
 ├── gemini_processor.py    # Gemini AI处理（指数退避重试 + 校验）
+├── retry.py               # Gemini、DeepSeek、SMTP 共用的重试逻辑
 ├── email_sender.py        # 邮件发送（Jinja2模板 + 指数退避重试）
 ├── logging_config.py      # 日志配置模块
 ├── main.py                # 主程序（计时 + 多模式）
@@ -76,6 +79,16 @@ daily_magic_bot/
 │   └── test_email_rendering.py# 邮件渲染端到端（mock 数据）
 └── README.md              # 本文件
 ```
+
+## 架构说明（开发者）
+
+`main.py` 按天气、新闻、AI 处理、邮件生成四个阶段编排日报流程：
+
+- **天气**（`weather_parser.py`）：按页面中的白天/夜间时段标签对齐当天预报，并从 `observe24h_data` 提取实况温度。北京和济南分别解析，单个城市失败时使用默认天气数据，不影响另一个城市。
+- **新闻**（`news_fetcher.py`）：多源并行抓取后按 URL 去重并筛选最近一天的新闻；标题和摘要在进入 AI 提示词前会清洗。
+- **AI**：`gemini_processor.py` 负责编排和结果校验，`prompts.py` 构造提示词，`ai_client.py` 负责请求传输。先生成问候、天气建议和新闻筛选结果，再批量翻译与摘要；Gemini 按 3.8 Flash → 3.5 Flash → 2.5 Pro 回退，全部失败后可选择使用 DeepSeek 兜底。选中新闻的详情在两次 AI 调用之间并发获取（`async_news_fetcher.py`）；Science 与 ScienceDaily 新闻直接使用 RSS 摘要，抓取详情失败时也回退到 RSS 摘要。
+- **邮件**（`email_sender.py`）：使用启用 HTML 自动转义的 Jinja2 模板；SMTP 根据端口使用 SSL（465）或 STARTTLS（通常为 587）。
+- **配置与重试**：`config.py` 从 `.env` 读取配置；`retry.py` 为 Gemini、DeepSeek 和 SMTP 提供共享重试逻辑。
 
 ## 安装步骤
 
