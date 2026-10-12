@@ -140,8 +140,8 @@ class AiClient:
             deepseek_model: 可选 DeepSeek 模型名（测试注入）
         """
         self.client = genai.Client(api_key=api_key)
-        # 模型回退链：首选 3.7-flash，高峰 503 时依次回退到 3.5-flash、2.5-pro
-        self.models = ['gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-2.5-pro']
+        # 模型回退链：首选 3.8-flash，高峰 503 时依次回退到 3.5-flash、2.5-pro
+        self.models = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-2.5-pro']
         # DeepSeek 兜底配置（Gemini 链全部失效时启用）
         self.deepseek_api_key = deepseek_api_key if deepseek_api_key is not None else config.DEEPSEEK_API_KEY
         self.deepseek_base_url = deepseek_base_url or config.DEEPSEEK_BASE_URL
